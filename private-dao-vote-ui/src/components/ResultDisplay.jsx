@@ -15,7 +15,7 @@ export default function ResultDisplay({ proposal }) {
 
   return (
     <section className="space-y-4">
-      <div className="glass-card p-6 sm:p-7 animate-fade-in">
+      <div className="glass-card p-5 sm:p-7 animate-fade-in">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
           <div>
             <div
@@ -25,7 +25,7 @@ export default function ResultDisplay({ proposal }) {
               FINAL RESULT
             </div>
             <h3
-              className="text-2xl sm:text-3xl font-display font-bold"
+              className="text-xl sm:text-3xl font-display font-bold"
               style={{ color: "var(--text-primary)" }}
             >
               Published Governance Result

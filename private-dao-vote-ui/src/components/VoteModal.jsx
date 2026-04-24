@@ -127,7 +127,7 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="text-sm font-mono px-2 py-1"
+                  className="text-xs sm:text-sm font-mono px-2 py-1"
                   style={{ color: "var(--text-secondary)" }}
                 >
                   CLOSE
@@ -233,14 +233,14 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
                   className="pt-4 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 border-t"
                   style={{ borderColor: "var(--border-subtle)" }}
                 >
-                  <button type="button" onClick={onClose} className="btn-secondary sm:min-w-[120px]">
+                  <button type="button" onClick={onClose} className="btn-secondary w-full sm:w-auto sm:min-w-[120px]">
                     Cancel
                   </button>
                   <button
                     type="button"
                     disabled={!selected}
                     onClick={handleVote}
-                    className="btn-primary flex-1"
+                    className="btn-primary flex-1 w-full"
                   >
                     {selected === 1
                       ? "Encrypt and Cast YES"

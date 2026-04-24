@@ -45,7 +45,7 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
 
   return (
     <div
-      className="glass-card-hover p-6 animate-cascade cursor-pointer"
+      className="glass-card-hover p-4 sm:p-6 animate-cascade cursor-pointer"
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -57,7 +57,7 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
       }}
       style={{ animationDelay: `${index * 70}ms` }}
     >
-      <div className="flex justify-between items-start gap-4 mb-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-3">
             <div
@@ -78,7 +78,7 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
                 PROPOSAL_{account.proposalId.toString()}
               </div>
               <h3
-                className="text-2xl font-display font-bold leading-tight truncate"
+                className="text-xl sm:text-2xl font-display font-bold leading-tight truncate"
                 style={{ color: "var(--text-primary)" }}
               >
                 {account.title}
@@ -93,7 +93,7 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+        <div className="flex flex-row sm:flex-col items-start sm:items-end gap-2 flex-shrink-0">
           <StatusBadge status={status} />
           <div
             className="px-2 py-1 text-xs font-mono"
@@ -108,7 +108,7 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         {metaCards.map((item) => (
           <div
             key={item.label}
@@ -215,7 +215,7 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
         </div>
         <button
           type="button"
-          className="btn-secondary"
+          className="btn-secondary w-full sm:w-auto"
           onClick={(event) => {
             event.stopPropagation();
             onClick?.();

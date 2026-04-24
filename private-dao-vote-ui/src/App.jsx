@@ -110,16 +110,16 @@ function ProposalDetail({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <button
         onClick={onBack}
-        className="btn-secondary"
+        className="btn-secondary w-full sm:w-auto"
         style={{ color: "var(--text-secondary)" }}
       >
         Back to Governance Queue
       </button>
 
-      <div className="glass-card p-6 sm:p-8 animate-fade-in">
+      <div className="glass-card p-5 sm:p-8 animate-fade-in">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
@@ -135,7 +135,7 @@ function ProposalDetail({
               </div>
             </div>
             <h1
-              className="text-3xl md:text-5xl font-display font-bold leading-tight"
+              className="text-3xl sm:text-4xl md:text-5xl font-display font-bold leading-tight"
               style={{ color: "var(--text-primary)" }}
             >
               {account.title}
@@ -149,7 +149,7 @@ function ProposalDetail({
           </div>
 
           {canVote && (
-            <button onClick={onVoteClick} className="btn-primary whitespace-nowrap">
+            <button onClick={onVoteClick} className="btn-primary w-full sm:w-auto whitespace-nowrap">
               Cast Encrypted Vote
             </button>
           )}
@@ -170,7 +170,7 @@ function ProposalDetail({
 
         {!votingEnded && (
           <div
-            className="mb-6 p-4 flex items-center justify-between gap-4"
+            className="mb-6 p-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
             style={{
               background: "rgb(139 92 246 / 0.08)",
               border: "1px solid rgb(139 92 246 / 0.2)",
@@ -192,7 +192,7 @@ function ProposalDetail({
               </div>
             </div>
             <div
-              className="text-xs font-mono text-right"
+              className="text-xs font-mono text-left sm:text-right"
               style={{ color: "var(--text-secondary)" }}
             >
               ENDS {formatDate(account.endTime.toNumber())}
@@ -471,13 +471,13 @@ export default function App() {
     <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
       <Header onNavigateHome={navigateHome} />
 
-      <main className="container mx-auto px-6 py-12">
+      <main className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {setupRequired ? (
           <SetupState />
         ) : page === "list" ? (
           <>
-            <div id="overview" className="mb-24 animate-fade-in">
-              <div className="grid xl:grid-cols-[minmax(0,1fr),500px] gap-10 items-start">
+            <div id="overview" className="mb-16 sm:mb-24 animate-fade-in">
+              <div className="grid xl:grid-cols-[minmax(0,1fr),500px] gap-8 sm:gap-10 items-start">
                 <div className="max-w-3xl">
                   <div className="flex items-center gap-2 mb-5 flex-wrap">
                     <div
@@ -515,7 +515,7 @@ export default function App() {
                   </div>
 
                   <h2
-                    className="text-6xl md:text-7xl xl:text-[5.5rem] font-display font-bold mb-5 leading-[0.92] tracking-tight max-w-[10ch]"
+                    className="text-4xl sm:text-6xl md:text-7xl xl:text-[5.5rem] font-display font-bold mb-5 leading-[0.92] tracking-tight max-w-[12ch] sm:max-w-[10ch]"
                     style={{ color: "var(--text-primary)" }}
                   >
                     Encrypted DAO
@@ -524,7 +524,7 @@ export default function App() {
                   </h2>
 
                   <p
-                    className="text-base md:text-lg mb-8 max-w-2xl font-body leading-8"
+                    className="text-sm sm:text-base md:text-lg mb-8 max-w-2xl font-body leading-7 sm:leading-8"
                     style={{ color: "var(--text-secondary)" }}
                   >
                     Confidential governance powered by Arcium MPC on Solana.
@@ -533,17 +533,17 @@ export default function App() {
                     onchain verification.
                   </p>
 
-                  <div className="flex gap-3 flex-wrap">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:flex-wrap">
                     {connected && (
                       <button
                         onClick={() => setShowCreate(true)}
-                        className="btn-primary animate-scale-in animation-delay-200"
+                        className="btn-primary w-full sm:w-auto animate-scale-in animation-delay-200"
                       >
                         Create Proposal
                       </button>
                     )}
                     <button
-                      className="btn-secondary"
+                      className="btn-secondary w-full sm:w-auto"
                       onClick={() =>
                         document.getElementById("protocol")?.scrollIntoView({
                           behavior: "smooth",
@@ -553,7 +553,7 @@ export default function App() {
                       View Protocol
                     </button>
                     <button
-                      className="btn-secondary"
+                      className="btn-secondary w-full sm:w-auto"
                       onClick={() => setRefreshNonce((value) => value + 1)}
                     >
                       Refresh
@@ -561,7 +561,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="glass-card p-6 animate-slide-up animation-delay-100">
+                <div className="glass-card p-4 sm:p-6 animate-slide-up animation-delay-100">
                   <div className="mb-4">
                     <div
                       className="text-xs font-mono mb-1"
@@ -577,7 +577,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                     {heroRuntime.map((item) => (
                       <div
                         key={item.label}
@@ -627,14 +627,14 @@ export default function App() {
                     </div>
                     <div className="relative">
                       <div
-                        className="absolute left-[12.5%] right-[12.5%] top-[26px] h-px"
+                        className="absolute left-[12.5%] right-[12.5%] top-[26px] h-px hidden md:block"
                         style={{
                           background:
                             "linear-gradient(90deg, rgb(139 92 246 / 0.12), rgb(139 92 246 / 0.5), rgb(139 92 246 / 0.12))",
                         }}
                       />
 
-                      <div className="grid grid-cols-4 gap-2 relative z-10">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 relative z-10">
                         {heroExecution.map((step) => (
                           <div
                             key={step.title}
@@ -708,10 +708,10 @@ export default function App() {
               </div>
             </div>
 
-            <div id="workflow" className="mb-20 animate-slide-up animation-delay-100">
+            <div id="workflow" className="mb-16 sm:mb-20 animate-slide-up animation-delay-100">
               <div className="mb-8">
                 <h3
-                  className="text-3xl font-display font-bold mb-3"
+                  className="text-2xl sm:text-3xl font-display font-bold mb-3"
                   style={{ color: "var(--text-primary)" }}
                 >
                   Governance Flow
@@ -744,7 +744,7 @@ export default function App() {
               </div>
             </div>
 
-            <div id="protocol" className="mb-20 animate-slide-up animation-delay-300">
+            <div id="protocol" className="mb-16 sm:mb-20 animate-slide-up animation-delay-300">
               <h3
                 className="text-2xl font-display font-bold mb-8"
                 style={{ color: "var(--text-primary)" }}
@@ -787,7 +787,7 @@ export default function App() {
               </div>
             </div>
 
-            <div id="security" className="mb-20 animate-slide-up animation-delay-400">
+            <div id="security" className="mb-16 sm:mb-20 animate-slide-up animation-delay-400">
               <h3
                 className="text-2xl font-display font-bold mb-8"
                 style={{ color: "var(--text-primary)" }}
@@ -834,7 +834,7 @@ export default function App() {
               </div>
             </div>
 
-            <div id="stack" className="mb-20 glass-card p-8 animate-slide-up animation-delay-500">
+            <div id="stack" className="mb-16 sm:mb-20 glass-card p-5 sm:p-8 animate-slide-up animation-delay-500">
               <h3
                 className="text-xl font-display font-bold mb-6"
                 style={{ color: "var(--text-primary)" }}
@@ -886,9 +886,9 @@ export default function App() {
         )}
       </main>
 
-      <footer className="mt-20 border-t" style={{ borderColor: "var(--border-subtle)" }}>
+      <footer className="mt-16 sm:mt-20 border-t" style={{ borderColor: "var(--border-subtle)" }}>
         <div
-          className="container mx-auto px-6 py-6 text-center font-mono text-sm"
+          className="container mx-auto px-4 sm:px-6 py-6 text-center font-mono text-xs sm:text-sm"
           style={{ color: "var(--text-secondary)" }}
         >
           <p>Powered by Arcium MPC on Solana Devnet - Private DAO Governance</p>

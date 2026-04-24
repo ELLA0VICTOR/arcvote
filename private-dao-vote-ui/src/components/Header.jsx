@@ -15,7 +15,7 @@ export default function Header({ onNavigateHome, sections = [] }) {
         WebkitBackdropFilter: "blur(20px)",
       }}
     >
-      <div className="container mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={onNavigateHome}
           className="flex items-center gap-3 text-left"
@@ -32,7 +32,7 @@ export default function Header({ onNavigateHome, sections = [] }) {
           </div>
           <div>
             <h1
-              className="text-xl font-display font-bold"
+              className="text-lg sm:text-xl font-display font-bold"
               style={{ color: "var(--text-primary)" }}
             >
               ArcVote
@@ -69,7 +69,7 @@ export default function Header({ onNavigateHome, sections = [] }) {
           </div>
         )}
 
-        <div className="flex items-center gap-4 lg:ml-auto">
+        <div className="flex items-center gap-4 lg:ml-auto w-full sm:w-auto justify-end">
           <WalletMultiButton />
         </div>
       </div>

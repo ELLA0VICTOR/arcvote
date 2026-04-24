@@ -243,7 +243,7 @@ export default function TallyPanel({ proposal, proposalId, onComplete, idl }) {
   return (
     <section className="space-y-4">
       {flow === FLOW.READY && (
-        <div className="glass-card p-6">
+        <div className="glass-card p-5 sm:p-6">
           <div className="flex items-start gap-3 mb-5">
             <div
               className="w-12 h-12 flex items-center justify-center flex-shrink-0"
@@ -313,7 +313,7 @@ export default function TallyPanel({ proposal, proposalId, onComplete, idl }) {
       )}
 
       {inProgress && (
-        <div className="glass-card p-6 animate-slide-up">
+        <div className="glass-card p-5 sm:p-6 animate-slide-up">
           <div className="text-center mb-6">
             <div className="w-16 h-16 mx-auto mb-4 relative">
               <svg className="animate-spin text-purple-400" fill="none" viewBox="0 0 24 24">
@@ -379,7 +379,7 @@ export default function TallyPanel({ proposal, proposalId, onComplete, idl }) {
       )}
 
       {flow === FLOW.COMPLETE && (
-        <div className="glass-card p-6 animate-fade-in">
+        <div className="glass-card p-5 sm:p-6 animate-fade-in">
           <div
             className="rounded-2xl p-6 text-center"
             style={{
@@ -420,7 +420,7 @@ export default function TallyPanel({ proposal, proposalId, onComplete, idl }) {
       )}
 
       {flow === FLOW.ERROR && (
-        <div className="glass-card p-6">
+        <div className="glass-card p-5 sm:p-6">
           <div
             className="p-5"
             style={{

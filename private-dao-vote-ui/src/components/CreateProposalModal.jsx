@@ -182,7 +182,7 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="text-sm font-mono px-2 py-1"
+                  className="text-xs sm:text-sm font-mono px-2 py-1"
                   style={{ color: "var(--text-secondary)" }}
                 >
                   CLOSE
@@ -291,7 +291,7 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
                   className="pt-3 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 border-t"
                   style={{ borderColor: "var(--border-subtle)" }}
                 >
-                  <button type="button" onClick={onClose} className="btn-secondary sm:min-w-[120px]">
+                  <button type="button" onClick={onClose} className="btn-secondary w-full sm:w-auto sm:min-w-[120px]">
                     Cancel
                   </button>
                   <button
@@ -303,7 +303,7 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
                       !customEndAt
                     }
                     onClick={handleCreate}
-                    className="btn-primary flex-1"
+                    className="btn-primary flex-1 w-full"
                   >
                     Create Proposal
                   </button>

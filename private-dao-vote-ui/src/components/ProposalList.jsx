@@ -144,7 +144,7 @@ export default function ProposalList({
 
   if (loading) {
     return (
-      <div className="glass-card p-12 text-center animate-fade-in">
+      <div className="glass-card p-8 sm:p-12 text-center animate-fade-in">
         <svg
           className="animate-spin h-10 w-10 mx-auto mb-4"
           style={{ color: "var(--purple-accent)" }}
@@ -178,7 +178,7 @@ export default function ProposalList({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3
-            className="text-2xl font-display font-bold"
+            className="text-xl sm:text-2xl font-display font-bold"
             style={{ color: "var(--text-primary)" }}
           >
             {activeSection.title}
@@ -188,7 +188,7 @@ export default function ProposalList({
           </p>
         </div>
         {connected && (
-          <button onClick={onRequestCreate} className="btn-primary">
+          <button onClick={onRequestCreate} className="btn-primary w-full sm:w-auto">
             Create New Proposal
           </button>
         )}
@@ -249,7 +249,7 @@ export default function ProposalList({
       </div>
 
       {activeSection.items.length === 0 ? (
-        <div className="glass-card p-12 text-center animate-fade-in">
+        <div className="glass-card p-8 sm:p-12 text-center animate-fade-in">
           <svg
             className="w-20 h-20 mx-auto mb-6 text-purple-400/50"
             fill="none"

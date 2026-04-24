@@ -106,7 +106,7 @@
   }
 
   .status-pill {
-    @apply px-3 py-1 rounded-full text-xs font-semibold;
+    @apply px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold;
   }
 
   .status-pill-active {
@@ -260,6 +260,11 @@
 }
 
 @media (max-width: 640px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
   .modal-shell {
     align-items: flex-start;
     padding: 0.75rem;
@@ -271,12 +276,15 @@
 
   .wallet-adapter-button {
     font-size: 12px !important;
-    padding: 0.5rem 0.75rem !important;
-    min-width: auto !important;
+    padding: 0.625rem 0.875rem !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    justify-content: center !important;
   }
 
   .wallet-adapter-button-trigger {
     white-space: nowrap;
+    width: 100%;
   }
 }
 
