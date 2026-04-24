@@ -23,7 +23,17 @@ private-dao-vote/artifacts/
 private-dao-vote/build/
 private-dao-vote/target/
 private-dao-vote/node_modules/
+private-dao-vote/target/deploy/*-keypair.json
+private-dao-vote/**/test-ledger/
 
 # Frontend generated artifacts
 private-dao-vote-ui/node_modules/
 private-dao-vote-ui/dist/
+
+# Extra sensitive local files
+**/.env
+**/.env.*
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*mnemonic*

@@ -10,7 +10,7 @@ export default {
         },
       },
       fontFamily: {
-        display: ["Syne", "system-ui", "sans-serif"],
+        display: ["Space Grotesk", "system-ui", "sans-serif"],
         body: ["Space Mono", "monospace"],
         mono: ["IBM Plex Mono", "monospace"],
       },

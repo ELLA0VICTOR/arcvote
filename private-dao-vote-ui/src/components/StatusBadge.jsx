@@ -4,6 +4,10 @@ export default function StatusBadge({ status }) {
       label: "Active",
       className: "status-pill status-pill-active",
     },
+    awaiting_tally: {
+      label: "Awaiting Tally",
+      className: "status-pill status-pill-tallying",
+    },
     tallying: {
       label: "Tallying",
       className: "status-pill status-pill-tallying",

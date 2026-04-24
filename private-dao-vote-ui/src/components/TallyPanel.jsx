@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import TallyIcon from "./icons/TallyIcon.jsx";
 import { encryptNull, decryptTallyResult } from "../lib/encryption.js";
 import {
@@ -10,7 +10,11 @@ import {
   getProposalPDA,
   getVoteStorePDA,
 } from "../lib/arcium.js";
-import { randomComputationOffset } from "../lib/solana.js";
+import {
+  createProgramFromProvider,
+  createProvider,
+  randomComputationOffset,
+} from "../lib/solana.js";
 import { PROGRAM_ID } from "../constants.js";
 
 const FLOW = {
@@ -40,13 +44,36 @@ const FLOW_PROGRESS = {
   [FLOW.PUBLISHING]: 100,
 };
 
-export default function TallyPanel({ proposalId, onComplete, idl }) {
+function getStoredAuthorityKey(proposalId) {
+  const raw = localStorage.getItem(`authority_key_${proposalId.toString()}`);
+  if (!raw) return null;
+
+  try {
+    return Uint8Array.from(
+      raw
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => Number(value))
+    );
+  } catch {
+    return null;
+  }
+}
+
+function isAlreadyProcessedError(error) {
+  const message = error?.message || "";
+  return message.includes("already been processed");
+}
+
+export default function TallyPanel({ proposal, proposalId, onComplete, idl }) {
   const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
 
   const [flow, setFlow] = useState(FLOW.READY);
   const [errorMessage, setErrorMessage] = useState("");
   const [publishSignature, setPublishSignature] = useState("");
+  const inFlightRef = useRef(false);
 
   const inProgress = [
     FLOW.ENCRYPTING,
@@ -57,62 +84,98 @@ export default function TallyPanel({ proposalId, onComplete, idl }) {
   ].includes(flow);
 
   async function runTally() {
-    if (!publicKey) return;
+    if (!publicKey || inFlightRef.current) return;
 
+    inFlightRef.current = true;
     setFlow(FLOW.ENCRYPTING);
     setErrorMessage("");
 
     try {
-      const provider = new AnchorProvider(
-        connection,
+      const provider = createProvider(
         { publicKey, signTransaction, signAllTransactions },
-        { commitment: "confirmed" }
+        connection
       );
-      const program = new Program(idl, PROGRAM_ID, provider);
-
+      const program = createProgramFromProvider(provider, idl);
       const mxePublicKey = await fetchMXEPublicKey(provider, PROGRAM_ID);
-      const {
-        ciphertext: authorityDummyCiphertext,
-        publicKey: authorityPublicKey,
-        nonceU128: authorityNonceU128,
-        privateKey: authorityPrivateKey,
-      } = encryptNull(mxePublicKey);
-
-      localStorage.setItem(
-        `authority_key_${proposalId.toString()}`,
-        Array.from(authorityPrivateKey).join(",")
-      );
-      localStorage.setItem(
-        `mxe_pubkey_${PROGRAM_ID}`,
-        Array.from(mxePublicKey).join(",")
-      );
-
       const proposalPDA = getProposalPDA(proposalId, PROGRAM_ID);
       const voteStorePDA = getVoteStorePDA(proposalId, PROGRAM_ID);
-      const computationOffset = randomComputationOffset();
-      const computationOffsetBN = new BN(computationOffset.toString());
-      const arciumAccounts = getArciumAccounts(computationOffsetBN, PROGRAM_ID);
 
-      setFlow(FLOW.QUEUING);
+      let currentProposal = await program.account.proposal.fetch(proposalPDA);
+      let authorityPrivateKey = getStoredAuthorityKey(proposalId);
+      let computationOffsetBN = currentProposal.computationOffset
+        ? new BN(currentProposal.computationOffset.toString())
+        : null;
 
-      await program.methods
-        .tallyVotes(
-          proposalId,
-          computationOffsetBN,
-          Array.from(authorityDummyCiphertext),
-          Array.from(authorityPublicKey),
-          new BN(authorityNonceU128.toString())
-        )
-        .accountsPartial({
-          authority: publicKey,
-          proposal: proposalPDA,
-          allVotesStore: voteStorePDA,
-          ...arciumAccounts,
-        })
-        .rpc({ commitment: "confirmed" });
+      if (currentProposal.status.finalized !== undefined) {
+        setFlow(FLOW.COMPLETE);
+        onComplete?.({
+          yesCount: currentProposal.yesCount ?? 0,
+          noCount: currentProposal.noCount ?? 0,
+          txSig: publishSignature,
+        });
+        return;
+      }
 
-      setFlow(FLOW.AWAITING_MPC);
-      await waitForComputation(provider, computationOffsetBN, PROGRAM_ID);
+      if (!computationOffsetBN) {
+        const {
+          ciphertext: authorityDummyCiphertext,
+          publicKey: authorityPublicKey,
+          nonceU128: authorityNonceU128,
+          privateKey,
+        } = encryptNull(mxePublicKey);
+
+        authorityPrivateKey = privateKey;
+        localStorage.setItem(
+          `authority_key_${proposalId.toString()}`,
+          Array.from(authorityPrivateKey).join(",")
+        );
+        localStorage.setItem(
+          `mxe_pubkey_${PROGRAM_ID}`,
+          Array.from(mxePublicKey).join(",")
+        );
+
+        const computationOffset = randomComputationOffset();
+        computationOffsetBN = new BN(computationOffset.toString());
+        const arciumAccounts = await getArciumAccounts(computationOffsetBN, PROGRAM_ID);
+
+        setFlow(FLOW.QUEUING);
+
+        try {
+          await program.methods
+            .tallyVotes(
+              proposalId,
+              computationOffsetBN,
+              Array.from(authorityDummyCiphertext),
+              Array.from(authorityPublicKey),
+              new BN(authorityNonceU128.toString())
+            )
+            .accountsPartial({
+              authority: publicKey,
+              proposal: proposalPDA,
+              allVotesStore: voteStorePDA,
+              ...arciumAccounts,
+            })
+            .rpc({ commitment: "confirmed" });
+        } catch (error) {
+          if (!isAlreadyProcessedError(error)) {
+            throw error;
+          }
+        }
+
+        currentProposal = await program.account.proposal.fetch(proposalPDA);
+        if (currentProposal.computationOffset) {
+          computationOffsetBN = new BN(currentProposal.computationOffset.toString());
+        }
+      } else if (!authorityPrivateKey) {
+        throw new Error(
+          "Tally has already been queued for this proposal in another session. Use the same browser/profile that initiated finalization to continue."
+        );
+      }
+
+      if (!currentProposal.tallyCiphertext || !currentProposal.tallyNonce) {
+        setFlow(FLOW.AWAITING_MPC);
+        await waitForComputation(provider, computationOffsetBN, PROGRAM_ID);
+      }
 
       setFlow(FLOW.DECRYPTING);
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -132,21 +195,40 @@ export default function TallyPanel({ proposalId, onComplete, idl }) {
 
       setFlow(FLOW.PUBLISHING);
 
-      const signature = await program.methods
-        .publishTally(proposalId, yesCount, noCount)
-        .accounts({
-          authority: publicKey,
-          proposal: proposalPDA,
-        })
-        .rpc({ commitment: "confirmed" });
+      let signature = "";
+
+      try {
+        signature = await program.methods
+          .publishTally(proposalId, yesCount, noCount)
+          .accounts({
+            authority: publicKey,
+            proposal: proposalPDA,
+          })
+          .rpc({ commitment: "confirmed" });
+      } catch (error) {
+        if (!isAlreadyProcessedError(error)) {
+          throw error;
+        }
+      }
+
+      const finalizedProposal = await program.account.proposal.fetch(proposalPDA);
+      if (finalizedProposal.status.finalized === undefined) {
+        throw new Error("Tally publish is still settling. Retry in a few seconds.");
+      }
 
       setPublishSignature(signature);
       setFlow(FLOW.COMPLETE);
-      onComplete?.({ yesCount, noCount, txSig: signature });
+      onComplete?.({
+        yesCount: finalizedProposal.yesCount ?? yesCount,
+        noCount: finalizedProposal.noCount ?? noCount,
+        txSig: signature,
+      });
     } catch (error) {
       console.error("Tally error:", error);
       setErrorMessage(error.message || "Tally process failed");
       setFlow(FLOW.ERROR);
+    } finally {
+      inFlightRef.current = false;
     }
   }
 

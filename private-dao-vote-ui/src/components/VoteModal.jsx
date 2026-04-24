@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { SystemProgram } from "@solana/web3.js";
-import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import LockIcon from "./icons/LockIcon.jsx";
 import VoteIcon from "./icons/VoteIcon.jsx";
 import { encryptVote, toHex } from "../lib/encryption.js";
@@ -11,6 +11,7 @@ import {
   getProposalPDA,
 } from "../lib/arcium.js";
 import { PROGRAM_ID } from "../constants.js";
+import { createProgramFromProvider, createProvider } from "../lib/solana.js";
 
 const STATE = {
   IDLE: "idle",
@@ -39,12 +40,11 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
     setErrorMessage("");
 
     try {
-      const provider = new AnchorProvider(
-        connection,
+      const provider = createProvider(
         { publicKey, signTransaction, signAllTransactions },
-        { commitment: "confirmed" }
+        connection
       );
-      const program = new Program(idl, PROGRAM_ID, provider);
+      const program = createProgramFromProvider(provider, idl);
 
       const mxePublicKey = await fetchMXEPublicKey(provider, PROGRAM_ID);
       const { encryptedVote, voterPublicKey, nonceU128, privateKey } =
@@ -95,7 +95,7 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
     >
       <div className="modal-shell px-3 py-4 sm:px-4 sm:py-8">
         <div
-          className="w-full max-w-2xl animate-slide-up"
+          className="modal-panel w-full max-w-2xl animate-slide-up"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="glass-card p-5 sm:p-8">

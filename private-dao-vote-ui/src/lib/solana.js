@@ -2,7 +2,7 @@
 //
 // Solana connection helpers, program initialization, and PDA derivation.
 
-import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
 import { PROGRAM_ID, SOLANA_RPC_URL } from "../constants.js";
 
@@ -16,6 +16,25 @@ export function createConnection() {
   });
 }
 
+function createReadonlyWallet() {
+  return {
+    publicKey: PublicKey.default,
+    signTransaction: async (tx) => tx,
+    signAllTransactions: async (txs) => txs,
+  };
+}
+
+function normalizeIdl(idl) {
+  return {
+    ...idl,
+    address: idl?.address ?? PROGRAM_ID,
+    metadata: {
+      ...(idl?.metadata ?? {}),
+      address: idl?.address ?? PROGRAM_ID,
+    },
+  };
+}
+
 /**
  * Creates an Anchor Program instance from a wallet and IDL.
  *
@@ -25,11 +44,55 @@ export function createConnection() {
  * @returns {Program}
  */
 export function createProgram(wallet, connection, idl) {
-  const provider = new AnchorProvider(connection, wallet, {
-    commitment: "confirmed",
-    skipPreflight: false,
-  });
-  return new Program(idl, new PublicKey(PROGRAM_ID), provider);
+  const provider = new AnchorProvider(
+    connection,
+    wallet?.publicKey ? wallet : createReadonlyWallet(),
+    {
+      commitment: "confirmed",
+      skipPreflight: false,
+    }
+  );
+
+  return new Program(normalizeIdl(idl), provider);
+}
+
+/**
+ * Creates an Anchor provider from a wallet and connection.
+ *
+ * @param {import('@solana/wallet-adapter-react').WalletContextState | object | undefined} wallet
+ * @param {Connection} connection
+ * @returns {AnchorProvider}
+ */
+export function createProvider(wallet, connection) {
+  return new AnchorProvider(
+    connection,
+    wallet?.publicKey ? wallet : createReadonlyWallet(),
+    {
+      commitment: "confirmed",
+      skipPreflight: false,
+    }
+  );
+}
+
+/**
+ * Creates a Program instance from an existing provider and IDL.
+ *
+ * @param {AnchorProvider} provider
+ * @param {object} idl
+ * @returns {Program}
+ */
+export function createProgramFromProvider(provider, idl) {
+  return new Program(normalizeIdl(idl), provider);
+}
+
+/**
+ * Returns the normalized frontend IDL shape.
+ *
+ * @param {object} idl
+ * @returns {object}
+ */
+export function getProgramIdl(idl) {
+  return normalizeIdl(idl);
 }
 
 /**
@@ -72,9 +135,11 @@ export function formatTimeRemaining(endTimestamp) {
   const days  = Math.floor(diff / 86400);
   const hours = Math.floor((diff % 86400) / 3600);
   const mins  = Math.floor((diff % 3600) / 60);
+  const secs = diff % 60;
   if (days > 0)  return `${days}D ${hours}H`;
   if (hours > 0) return `${hours}H ${mins}M`;
-  return `${mins}M`;
+  if (mins > 0) return `${mins}M ${secs}S`;
+  return `${secs}S`;
 }
 
 /**
@@ -131,13 +196,37 @@ export async function fetchAllProposals(program) {
 /**
  * Returns the proposal status as a string key.
  * @param {object} proposal - Proposal account data
- * @returns {'active' | 'tallying' | 'finalized'}
+ * @returns {'active' | 'awaiting_tally' | 'tallying' | 'finalized'}
  */
 export function getProposalStatus(proposal) {
-  if (proposal.status.active !== undefined)    return "active";
-  if (proposal.status.tallying !== undefined)  return "tallying";
   if (proposal.status.finalized !== undefined) return "finalized";
-  return "active";
+  if (proposal.status.tallying !== undefined)  return "tallying";
+  if (proposal.status.active !== undefined) {
+    return isVotingEnded(proposal) ? "awaiting_tally" : "active";
+  }
+  return isVotingEnded(proposal) ? "awaiting_tally" : "active";
+}
+
+/**
+ * Returns whether the proposal should be grouped into the tally queue.
+ * This includes expired active proposals waiting for the authority to tally.
+ *
+ * @param {object} proposal
+ * @returns {boolean}
+ */
+export function isInTallyQueue(proposal) {
+  const status = getProposalStatus(proposal);
+  return status === "awaiting_tally" || status === "tallying";
+}
+
+/**
+ * Returns whether the proposal is finalized.
+ *
+ * @param {object} proposal
+ * @returns {boolean}
+ */
+export function isFinalized(proposal) {
+  return getProposalStatus(proposal) === "finalized";
 }
 
 /**
@@ -147,4 +236,14 @@ export function getProposalStatus(proposal) {
  */
 export function isVotingEnded(proposal) {
   return Math.floor(Date.now() / 1000) > proposal.endTime.toNumber();
+}
+
+/**
+ * Returns whether the proposal is still actively accepting votes.
+ *
+ * @param {object} proposal
+ * @returns {boolean}
+ */
+export function isVotingOpen(proposal) {
+  return getProposalStatus(proposal) === "active";
 }

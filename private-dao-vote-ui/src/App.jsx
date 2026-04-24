@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+﻿import { useEffect, useState } from "react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 
 import Header from "./components/Header.jsx";
 import ProposalList from "./components/ProposalList.jsx";
@@ -8,14 +8,17 @@ import VoteModal from "./components/VoteModal.jsx";
 import TallyPanel from "./components/TallyPanel.jsx";
 import ResultDisplay from "./components/ResultDisplay.jsx";
 import StatusBadge from "./components/StatusBadge.jsx";
+import BrandMarkIcon from "./components/icons/BrandMarkIcon.jsx";
 import LockIcon from "./components/icons/LockIcon.jsx";
 import ShieldIcon from "./components/icons/ShieldIcon.jsx";
 import TallyIcon from "./components/icons/TallyIcon.jsx";
 
 import {
+  createProgram,
   formatDate,
   formatTimeRemaining,
   getProposalStatus,
+  isInTallyQueue,
   isVotingEnded,
 } from "./lib/solana.js";
 import { IS_PROGRAM_ID_PLACEHOLDER } from "./constants.js";
@@ -38,20 +41,11 @@ async function loadIdl() {
 function SetupState() {
   return (
     <div className="glass-card p-12 text-center animate-fade-in">
-      <svg
-        className="w-16 h-16 mx-auto mb-4"
-        style={{ color: "var(--purple-accent)" }}
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-        />
-      </svg>
+      <BrandMarkIcon
+        size={36}
+        color="var(--purple-accent)"
+        className="mx-auto mb-4"
+      />
       <h3
         className="text-2xl font-display font-bold mb-2"
         style={{ color: "var(--text-primary)" }}
@@ -81,9 +75,16 @@ function ProposalDetail({
   if (!proposal) return null;
 
   const account = proposal.account;
-  const showTallyPanel =
-    isAuthority &&
-    ((proposalStatus === "active" && votingEnded) || proposalStatus === "tallying");
+  const [, setClockTick] = useState(0);
+  const showTallyPanel = isAuthority && isInTallyQueue(account);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setClockTick((value) => value + 1);
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [proposal.publicKey.toBase58()]);
 
   const detailMetrics = [
     {
@@ -167,113 +168,61 @@ function ProposalDetail({
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-4">
-          <div className="detail-note">
-            <div className="text-sm font-mono mb-2" style={{ color: "var(--purple-accent)" }}>
-              BALLOT SECRECY
+        {!votingEnded && (
+          <div
+            className="mb-6 p-4 flex items-center justify-between gap-4"
+            style={{
+              background: "rgb(139 92 246 / 0.08)",
+              border: "1px solid rgb(139 92 246 / 0.2)",
+              borderRadius: "12px",
+            }}
+          >
+            <div>
+              <div
+                className="text-xs font-mono mb-1"
+                style={{ color: "var(--purple-accent)" }}
+              >
+                LIVE COUNTDOWN
+              </div>
+              <div
+                className="text-lg font-display font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {formatTimeRemaining(account.endTime.toNumber())}
+              </div>
             </div>
-            <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
-              Participation is visible onchain, but the direction of each vote stays
-              encrypted until the aggregate result is computed by Arcium MPC.
-            </p>
-          </div>
-          <div className="detail-note">
-            <div className="text-sm font-mono mb-2" style={{ color: "var(--purple-accent)" }}>
-              VERIFIED FINALITY
+            <div
+              className="text-xs font-mono text-right"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              ENDS {formatDate(account.endTime.toNumber())}
             </div>
-            <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
-              The callback output is verified onchain before the tally is published,
-              so the result is traceable and auditable from queueing to final reveal.
-            </p>
           </div>
-        </div>
+        )}
+
       </div>
 
-      <div className="grid xl:grid-cols-[1.2fr,0.8fr] gap-6">
-        <div className="space-y-6">
-          {showTallyPanel && (
-            <TallyPanel
-              proposal={account}
-              proposalId={account.proposalId}
-              idl={idl}
-              onComplete={onTallyComplete}
-            />
-          )}
+      <div className="space-y-6">
+        {showTallyPanel && (
+          <TallyPanel
+            proposal={account}
+            proposalId={account.proposalId}
+            idl={idl}
+            onComplete={onTallyComplete}
+          />
+        )}
 
-          {proposalStatus === "finalized" && account.yesCount !== null && (
-            <ResultDisplay proposal={account} />
-          )}
-        </div>
-
-        <div className="space-y-6">
-          <div className="glass-card p-6">
-            <div className="flex items-start gap-3">
-              <LockIcon size={18} color="var(--purple-accent)" />
-              <div>
-                <div
-                  className="text-sm font-mono mb-2"
-                  style={{ color: "var(--purple-accent)" }}
-                >
-                  PRIVACY MODEL
-                </div>
-                <p className="text-sm font-body leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  Public: who voted, when votes landed, and proposal lifecycle status.
-                  Private: how each wallet voted. The tally is computed only in
-                  aggregate by Arcium’s MPC network.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card p-6">
-            <div className="flex items-start gap-3">
-              <ShieldIcon size={18} color="var(--purple-accent)" />
-              <div>
-                <div
-                  className="text-sm font-mono mb-2"
-                  style={{ color: "var(--purple-accent)" }}
-                >
-                  ASSURANCE
-                </div>
-                <p className="text-sm font-body leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  Final tallies are accepted only after Arcium returns a signed result
-                  and the program verifies that output onchain. The result is not
-                  trusted by convention.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card p-6">
-            <div
-              className="text-sm font-mono mb-4"
-              style={{ color: "var(--purple-accent)" }}
-            >
-              OPERATIONAL NOTES
-            </div>
-            <div className="space-y-3 text-sm font-body" style={{ color: "var(--text-secondary)" }}>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400">•</span>
-                <span>Each proposal currently supports up to 10 encrypted ballots.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400">•</span>
-                <span>The authority executes the tally and publishes the final result.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400">•</span>
-                <span>Proposal state persists entirely onchain on Solana devnet.</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {proposalStatus === "finalized" && account.yesCount !== null && (
+          <ResultDisplay proposal={account} />
+        )}
       </div>
     </div>
   );
 }
 
 export default function App() {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, signTransaction, signAllTransactions } = useWallet();
+  const { connection } = useConnection();
 
   const [idl, setIdl] = useState(null);
   const [page, setPage] = useState("list");
@@ -287,6 +236,8 @@ export default function App() {
     tallying: 0,
     finalized: 0,
   });
+  const selectedProposalKey = selectedProposal?.publicKey?.toBase58() ?? null;
+  const selectedProposalPublicKey = selectedProposal?.publicKey ?? null;
 
   const setupRequired = !idl || Boolean(idl?._NOTE) || IS_PROGRAM_ID_PLACEHOLDER;
 
@@ -308,6 +259,61 @@ export default function App() {
     onHash();
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
+
+  useEffect(() => {
+    if (!idl || page !== "detail" || !selectedProposalKey || !selectedProposalPublicKey) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    const walletInterface = connected && publicKey
+      ? { publicKey, signTransaction, signAllTransactions }
+      : undefined;
+
+    async function refreshSelectedProposal() {
+      try {
+        const program = createProgram(walletInterface, connection, idl);
+        const refreshedAccount = await program.account.proposal.fetch(selectedProposalPublicKey);
+
+        if (!isCancelled) {
+          setSelectedProposal((current) => {
+            if (!current || current.publicKey.toBase58() !== selectedProposalKey) {
+              return current;
+            }
+
+            return {
+              publicKey: current.publicKey,
+              account: refreshedAccount,
+            };
+          });
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Failed to refresh selected proposal:", error);
+        }
+      }
+    }
+
+    refreshSelectedProposal();
+    const intervalId = window.setInterval(refreshSelectedProposal, 4000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    idl,
+    page,
+    selectedProposalKey,
+    selectedProposalPublicKey,
+    refreshNonce,
+    connection,
+    connected,
+    publicKey,
+    signTransaction,
+    signAllTransactions,
+  ]);
 
   function navigateToProposal(proposal) {
     setSelectedProposal(proposal);
@@ -383,6 +389,84 @@ export default function App() {
     },
   ];
 
+  const workflowCards = [
+    {
+      label: "01_CREATE",
+      title: "Publish Proposal",
+      copy:
+        "The authority creates a proposal, defines the voting window, and initializes encrypted null padding for the fixed tally circuit.",
+    },
+    {
+      label: "02_COLLECT",
+      title: "Capture Encrypted Votes",
+      copy:
+        "Wallets cast ballots locally encrypted in the browser, so the chain records participation without exposing vote direction.",
+    },
+    {
+      label: "03_COMPUTE",
+      title: "Trigger Arcium MPC",
+      copy:
+        "Once voting ends, the authority queues a real MPC computation so Arx nodes can derive only the aggregate result.",
+    },
+    {
+      label: "04_PUBLISH",
+      title: "Reveal Verified Outcome",
+      copy:
+        "The callback is verified onchain, the aggregate tally is decrypted locally by the authority, and the final result is published.",
+    },
+  ];
+
+  const heroRuntime = [
+    {
+      label: "Network",
+      value: "Solana Devnet",
+      tone: "var(--purple-accent)",
+      note: "Cluster 456",
+    },
+    {
+      label: "Privacy",
+      value: "Arcium MPC",
+      tone: "var(--purple-accent)",
+      note: "Encrypted tally",
+    },
+    {
+      label: "Settlement",
+      value: "Verified Output",
+      tone: "var(--purple-accent)",
+      note: "Onchain callback",
+    },
+  ];
+
+  const heroExecution = [
+    {
+      title: "Intake",
+      meta: "Proposal state",
+    },
+    {
+      title: "Encrypt",
+      meta: "Sealed ballots",
+    },
+    {
+      title: "Tally",
+      meta: "Arcium MPC",
+    },
+    {
+      title: "Reveal",
+      meta: "Verified result",
+    },
+  ];
+
+  const heroMetrics = [
+    {
+      label: "Indexed Proposals",
+      value: String(stats.total).padStart(2, "0"),
+    },
+    {
+      label: "Open Ballots",
+      value: String(stats.active).padStart(2, "0"),
+    },
+  ];
+
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
       <Header onNavigateHome={navigateHome} />
@@ -392,136 +476,275 @@ export default function App() {
           <SetupState />
         ) : page === "list" ? (
           <>
-            <div className="mb-20 animate-fade-in">
-              <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <div
-                  className="px-2 py-1 text-xs font-mono font-bold tracking-wider"
-                  style={{
-                    background: "var(--purple-accent)",
-                    color: "white",
-                    borderRadius: "2px",
-                  }}
-                >
-                  MPC-SECURED
+            <div id="overview" className="mb-24 animate-fade-in">
+              <div className="grid xl:grid-cols-[minmax(0,1fr),500px] gap-10 items-start">
+                <div className="max-w-3xl">
+                  <div className="flex items-center gap-2 mb-5 flex-wrap">
+                    <div
+                      className="px-2 py-1 text-xs font-mono font-bold tracking-wider"
+                      style={{
+                        background: "var(--purple-accent)",
+                        color: "white",
+                        borderRadius: "2px",
+                      }}
+                    >
+                      MPC-SECURED
+                    </div>
+                    <div
+                      className="px-2 py-1 text-xs font-mono"
+                      style={{
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: "2px",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      SOLANA DEVNET
+                    </div>
+                    {connected && (
+                      <div
+                        className="px-2 py-1 text-xs font-mono animate-fade-in"
+                        style={{
+                          border: "1px solid var(--purple-accent)",
+                          borderRadius: "2px",
+                          color: "var(--purple-accent)",
+                        }}
+                      >
+                        GOVERNANCE READY
+                      </div>
+                    )}
+                  </div>
+
+                  <h2
+                    className="text-6xl md:text-7xl xl:text-[5.5rem] font-display font-bold mb-5 leading-[0.92] tracking-tight max-w-[10ch]"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Encrypted DAO
+                    <br />
+                    Governance
+                  </h2>
+
+                  <p
+                    className="text-base md:text-lg mb-8 max-w-2xl font-body leading-8"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Confidential governance powered by Arcium MPC on Solana.
+                    Proposals remain public, ballot direction remains sealed, and
+                    final tallies are revealed only after encrypted computation and
+                    onchain verification.
+                  </p>
+
+                  <div className="flex gap-3 flex-wrap">
+                    {connected && (
+                      <button
+                        onClick={() => setShowCreate(true)}
+                        className="btn-primary animate-scale-in animation-delay-200"
+                      >
+                        Create Proposal
+                      </button>
+                    )}
+                    <button
+                      className="btn-secondary"
+                      onClick={() =>
+                        document.getElementById("protocol")?.scrollIntoView({
+                          behavior: "smooth",
+                        })
+                      }
+                    >
+                      View Protocol
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      onClick={() => setRefreshNonce((value) => value + 1)}
+                    >
+                      Refresh
+                    </button>
+                  </div>
                 </div>
-                <div
-                  className="px-2 py-1 text-xs font-mono"
-                  style={{
-                    border: "1px solid var(--border-subtle)",
-                    borderRadius: "2px",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  SOLANA DEVNET
-                </div>
-                {connected && (
+
+                <div className="glass-card p-6 animate-slide-up animation-delay-100">
+                  <div className="mb-4">
+                    <div
+                      className="text-xs font-mono mb-1"
+                      style={{ color: "var(--purple-accent)" }}
+                    >
+                      EXECUTION SURFACE
+                    </div>
+                    <div
+                      className="text-lg font-display font-bold"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Governance Runtime
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {heroRuntime.map((item) => (
+                      <div
+                        key={item.label}
+                        className="p-3"
+                        style={{
+                          background: "rgb(255 255 255 / 0.04)",
+                          border: "1px solid rgb(255 255 255 / 0.06)",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        <div
+                          className="text-[10px] font-mono uppercase tracking-wide mb-2"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {item.label}
+                        </div>
+                        <div
+                          className="text-sm font-mono mb-1"
+                          style={{ color: item.tone }}
+                        >
+                          {item.value}
+                        </div>
+                        <div
+                          className="text-[10px] font-body"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {item.note}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   <div
-                    className="px-2 py-1 text-xs font-mono animate-fade-in"
+                    className="p-4 mb-4 relative overflow-hidden"
                     style={{
-                      border: "1px solid var(--purple-accent)",
-                      borderRadius: "2px",
-                      color: "var(--purple-accent)",
+                      background:
+                        "linear-gradient(180deg, rgb(255 255 255 / 0.04), rgb(255 255 255 / 0.02))",
+                      border: "1px solid rgb(255 255 255 / 0.06)",
+                      borderRadius: "4px",
                     }}
                   >
-                    GOVERNANCE READY
+                    <div
+                      className="text-xs font-mono mb-4"
+                      style={{ color: "var(--purple-accent)" }}
+                    >
+                      EXECUTION GRAPH
+                    </div>
+                    <div className="relative">
+                      <div
+                        className="absolute left-[12.5%] right-[12.5%] top-[26px] h-px"
+                        style={{
+                          background:
+                            "linear-gradient(90deg, rgb(139 92 246 / 0.12), rgb(139 92 246 / 0.5), rgb(139 92 246 / 0.12))",
+                        }}
+                      />
+
+                      <div className="grid grid-cols-4 gap-2 relative z-10">
+                        {heroExecution.map((step) => (
+                          <div
+                            key={step.title}
+                            className="p-3"
+                            style={{
+                              background: "rgb(255 255 255 / 0.03)",
+                              border: "1px solid rgb(255 255 255 / 0.06)",
+                              borderRadius: "4px",
+                              minHeight: "88px",
+                            }}
+                          >
+                            <div className="mb-3 flex justify-center">
+                              <div
+                                className="h-7 w-7 flex items-center justify-center"
+                                style={{
+                                  background: "rgb(139 92 246 / 0.08)",
+                                  border: "1px solid rgb(139 92 246 / 0.32)",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                <BrandMarkIcon size={12} color="var(--purple-accent)" />
+                              </div>
+                            </div>
+
+                            <div
+                              className="text-sm font-display font-bold mb-1 text-center"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              {step.title}
+                            </div>
+
+                            <div
+                              className="text-[11px] font-mono text-center"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {step.meta}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              <h2
-                className="text-6xl font-display font-bold mb-4 leading-tight"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Private DAO
-                <br />
-                Voting
-              </h2>
-
-              <p
-                className="text-base mb-8 max-w-2xl font-body"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Confidential governance powered by Arcium MPC on Solana. Proposals
-                remain public, ballot direction remains sealed, and final tallies are
-                revealed only after encrypted computation and onchain verification.
-              </p>
-
-              <div className="flex gap-3 flex-wrap">
-                {connected && (
-                  <button
-                    onClick={() => setShowCreate(true)}
-                    className="btn-primary animate-scale-in animation-delay-200"
-                  >
-                    Create Proposal
-                  </button>
-                )}
-                <button
-                  className="btn-secondary"
-                  onClick={() =>
-                    document.getElementById("how-it-works")?.scrollIntoView({
-                      behavior: "smooth",
-                    })
-                  }
-                >
-                  View Protocol
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => setRefreshNonce((value) => value + 1)}
-                >
-                  Refresh
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-20 animate-slide-up animation-delay-100">
-              <div className="glass-card p-4">
-                <div
-                  className="text-3xl font-display font-bold mb-1"
-                  style={{ color: "var(--purple-accent)" }}
-                >
-                  {stats.total}
-                </div>
-                <div className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>
-                  TOTAL_PROPOSALS
-                </div>
-              </div>
-              <div className="glass-card p-4">
-                <div
-                  className="text-3xl font-display font-bold mb-1"
-                  style={{ color: "var(--purple-accent)" }}
-                >
-                  {stats.active}
-                </div>
-                <div className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>
-                  ACTIVE_VOTES
-                </div>
-              </div>
-              <div className="glass-card p-4">
-                <div
-                  className="text-3xl font-display font-bold mb-1"
-                  style={{ color: "var(--purple-accent)" }}
-                >
-                  {stats.tallying}
-                </div>
-                <div className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>
-                  MPC_TALLYING
-                </div>
-              </div>
-              <div className="glass-card p-4">
-                <div
-                  className="text-3xl font-display font-bold mb-1"
-                  style={{ color: "var(--purple-accent)" }}
-                >
-                  {stats.finalized}
-                </div>
-                <div className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>
-                  FINALIZED
+                  <div className="grid grid-cols-2 gap-3">
+                    {heroMetrics.map((metric) => (
+                      <div
+                        key={metric.label}
+                        className="p-4"
+                        style={{
+                          background: "rgb(255 255 255 / 0.05)",
+                          border: "1px solid rgb(255 255 255 / 0.06)",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        <div
+                          className="text-[11px] font-mono mb-2"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {metric.label.toUpperCase()}
+                        </div>
+                        <div
+                          className="text-2xl font-display font-bold"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {metric.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div id="how-it-works" className="mb-20 animate-slide-up animation-delay-200">
+            <div id="workflow" className="mb-20 animate-slide-up animation-delay-100">
+              <div className="mb-8">
+                <h3
+                  className="text-3xl font-display font-bold mb-3"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Governance Flow
+                </h3>
+                <p className="text-sm font-body max-w-2xl" style={{ color: "var(--text-secondary)" }}>
+                  The full ArcVote lifecycle, from proposal creation to verified tally
+                  publication, mapped into one clean operational flow.
+                </p>
+              </div>
+              <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+                {workflowCards.map((card) => (
+                  <div key={card.label} className="glass-card-hover p-5">
+                    <div
+                      className="text-xs font-mono mb-3"
+                      style={{ color: "var(--purple-accent)" }}
+                    >
+                      {card.label}
+                    </div>
+                    <h4
+                      className="text-xl font-display font-bold mb-2"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {card.title}
+                    </h4>
+                    <p className="text-sm font-body leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                      {card.copy}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div id="protocol" className="mb-20 animate-slide-up animation-delay-300">
               <h3
                 className="text-2xl font-display font-bold mb-8"
                 style={{ color: "var(--text-primary)" }}
@@ -564,7 +787,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="mb-20 animate-slide-up animation-delay-300">
+            <div id="security" className="mb-20 animate-slide-up animation-delay-400">
               <h3
                 className="text-2xl font-display font-bold mb-8"
                 style={{ color: "var(--text-primary)" }}
@@ -611,7 +834,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="mb-20 glass-card p-8 animate-slide-up animation-delay-400">
+            <div id="stack" className="mb-20 glass-card p-8 animate-slide-up animation-delay-500">
               <h3
                 className="text-xl font-display font-bold mb-6"
                 style={{ color: "var(--text-primary)" }}
@@ -697,3 +920,4 @@ export default function App() {
     </div>
   );
 }
+

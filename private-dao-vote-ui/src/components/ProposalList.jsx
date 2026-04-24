@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import ProposalCard from "./ProposalCard.jsx";
-import { PROGRAM_ID } from "../constants.js";
-import { fetchAllProposals, getProposalStatus } from "../lib/solana.js";
+import {
+  createProgram,
+  fetchAllProposals,
+  getProposalStatus,
+  isInTallyQueue,
+} from "../lib/solana.js";
 
 export default function ProposalList({
   onSelectProposal,
@@ -14,49 +17,130 @@ export default function ProposalList({
 }) {
   const { publicKey, signTransaction, signAllTransactions, connected } = useWallet();
   const { connection } = useConnection();
-  const [filter, setFilter] = useState("all");
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [clockTick, setClockTick] = useState(0);
+  const [currentView, setCurrentView] = useState("active");
 
   useEffect(() => {
     if (!idl) return;
     loadProposals();
   }, [idl, refreshNonce]);
 
-  async function loadProposals() {
-    setLoading(true);
+  useEffect(() => {
+    if (!idl) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      loadProposals(true);
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [idl, connection, connected, publicKey, signTransaction, signAllTransactions]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setClockTick((value) => value + 1);
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    if (!proposals.length) {
+      onStatsChange?.({
+        total: 0,
+        active: 0,
+        tallying: 0,
+        finalized: 0,
+      });
+      return;
+    }
+
+    onStatsChange?.({
+      total: proposals.length,
+      active: proposals.filter((item) => getProposalStatus(item.account) === "active").length,
+      tallying: proposals.filter((item) => isInTallyQueue(item.account)).length,
+      finalized: proposals.filter((item) => getProposalStatus(item.account) === "finalized").length,
+    });
+  }, [proposals, onStatsChange, clockTick]);
+
+  async function loadProposals(isSilent = false) {
+    if (!isSilent) {
+      setLoading(true);
+    }
     try {
       const walletInterface = connected && publicKey
         ? { publicKey, signTransaction, signAllTransactions }
-        : { publicKey: null, signTransaction: null, signAllTransactions: null };
+        : undefined;
 
-      const provider = new AnchorProvider(connection, walletInterface, {
-        commitment: "confirmed",
-      });
-      const program = new Program(idl, PROGRAM_ID, provider);
+      const program = createProgram(walletInterface, connection, idl);
       const all = await fetchAllProposals(program);
       setProposals(all);
-
-      onStatsChange?.({
-        total: all.length,
-        active: all.filter((item) => getProposalStatus(item.account) === "active").length,
-        tallying: all.filter((item) => getProposalStatus(item.account) === "tallying").length,
-        finalized: all.filter((item) => getProposalStatus(item.account) === "finalized").length,
-      });
     } catch (error) {
       console.error("Failed to load proposals:", error);
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   }
 
-  const filtered = proposals.filter((proposal) => {
-    const status = getProposalStatus(proposal.account);
-    if (filter === "active") return status === "active";
-    if (filter === "tallying") return status === "tallying";
-    if (filter === "finalized") return status === "finalized";
-    return true;
-  });
+  const activeProposals = proposals.filter(
+    (proposal) => getProposalStatus(proposal.account) === "active"
+  );
+  const tallyQueue = proposals.filter((proposal) => isInTallyQueue(proposal.account));
+  const finalizedProposals = proposals.filter(
+    (proposal) => getProposalStatus(proposal.account) === "finalized"
+  );
+
+  const sections = [
+    {
+      key: "active",
+      label: "Active",
+      title: "Active Governance Queue",
+      subtitle: "ONLY OPEN PRIVATE PROPOSALS ARE SHOWN IN THIS VIEW",
+      emptyTitle: "No Active Proposals",
+      emptyCopy: connected
+        ? "Create a fresh proposal or wait for the next governance item to open."
+        : "Connect a wallet to create or participate in active governance proposals.",
+      items: activeProposals,
+    },
+    {
+      key: "tallying",
+      label: "Tally Queue",
+      title: "Tally Queue",
+      subtitle: "EXPIRED PROPOSALS WAITING FOR AUTHORITY FINALIZATION",
+      emptyTitle: "No Proposals Awaiting Tally",
+      emptyCopy: "Everything that has expired has either already been finalized or no tally is pending yet.",
+      items: tallyQueue,
+    },
+    {
+      key: "finalized",
+      label: "Finalized",
+      title: "Finalized Archive",
+      subtitle: "COMPLETED PROPOSALS WITH PUBLISHED RESULTS",
+      emptyTitle: "No Finalized Proposals Yet",
+      emptyCopy: "Published governance outcomes will appear here once the Arcium tally flow has completed.",
+      items: finalizedProposals,
+    },
+  ];
+
+  const activeSection = sections.find((section) => section.key === currentView) ?? sections[0];
+
+  function renderProposalGrid(items) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {items.map((proposal, index) => (
+          <div
+            key={proposal.publicKey.toBase58()}
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <ProposalCard proposal={proposal} onClick={() => onSelectProposal(proposal)} />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -97,10 +181,10 @@ export default function ProposalList({
             className="text-2xl font-display font-bold"
             style={{ color: "var(--text-primary)" }}
           >
-            Governance Queue
+            {activeSection.title}
           </h3>
           <p className="text-sm font-mono mt-1" style={{ color: "var(--text-secondary)" }}>
-            LIVE PRIVATE PROPOSALS ON SOLANA DEVNET
+            {activeSection.subtitle}
           </p>
         </div>
         {connected && (
@@ -110,52 +194,61 @@ export default function ProposalList({
         )}
       </div>
 
-      {proposals.length > 0 && (
-        <div className="flex flex-wrap gap-3 justify-center">
-          {[
-            ["all", "All", proposals.length],
-            [
-              "active",
-              "Active",
-              proposals.filter((item) => getProposalStatus(item.account) === "active").length,
-            ],
-            [
-              "tallying",
-              "Tallying",
-              proposals.filter((item) => getProposalStatus(item.account) === "tallying").length,
-            ],
-            [
-              "finalized",
-              "Finalized",
-              proposals.filter((item) => getProposalStatus(item.account) === "finalized").length,
-            ],
-          ].map(([value, label, count]) => (
-            <button
-              key={value}
-              onClick={() => setFilter(value)}
-              className="px-4 py-2 text-sm font-mono transition-all"
-              style={
-                filter === value
-                  ? {
-                      background: "var(--purple-accent)",
-                      color: "white",
-                      borderRadius: "2px",
-                    }
-                  : {
-                      border: "1px solid var(--border-subtle)",
-                      color: "var(--text-secondary)",
-                      borderRadius: "2px",
-                      background: "transparent",
-                    }
-              }
-            >
-              {label.toUpperCase()} ({count})
-            </button>
-          ))}
+      <div className="space-y-3">
+        <div className="sm:hidden">
+          <label
+            htmlFor="proposal-view"
+            className="block text-xs font-mono mb-2"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            QUEUE_VIEW
+          </label>
+          <select
+            id="proposal-view"
+            className="input-field w-full"
+            value={currentView}
+            onChange={(event) => setCurrentView(event.target.value)}
+          >
+            {sections.map((section) => (
+              <option key={section.key} value={section.key}>
+                {section.label} ({section.items.length})
+              </option>
+            ))}
+          </select>
         </div>
-      )}
 
-      {proposals.length === 0 ? (
+        <div className="hidden sm:flex flex-wrap gap-3">
+          {sections.map((section) => {
+            const isSelected = section.key === currentView;
+            return (
+              <button
+                key={section.key}
+                type="button"
+                onClick={() => setCurrentView(section.key)}
+                className="px-4 py-2 text-sm font-mono transition-all"
+                style={
+                  isSelected
+                    ? {
+                        background: "var(--purple-accent)",
+                        color: "white",
+                        borderRadius: "2px",
+                      }
+                    : {
+                        border: "1px solid var(--border-subtle)",
+                        color: "var(--text-secondary)",
+                        borderRadius: "2px",
+                        background: "transparent",
+                      }
+                }
+              >
+                {section.label.toUpperCase()} ({section.items.length})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {activeSection.items.length === 0 ? (
         <div className="glass-card p-12 text-center animate-fade-in">
           <svg
             className="w-20 h-20 mx-auto mb-6 text-purple-400/50"
@@ -170,11 +263,13 @@ export default function ProposalList({
               d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
             />
           </svg>
-          <h3 className="text-2xl font-display font-bold mb-2">No Proposals Yet</h3>
+          <h3 className="text-2xl font-display font-bold mb-2">
+            {activeSection.emptyTitle}
+          </h3>
           <p className="mb-6 font-body" style={{ color: "var(--text-secondary)" }}>
-            Be the first to create a private governance proposal
+            {activeSection.emptyCopy}
           </p>
-          {connected && (
+          {connected && currentView === "active" && (
             <div
               className="inline-block px-6 py-3"
               style={{
@@ -193,20 +288,8 @@ export default function ProposalList({
             </div>
           )}
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="glass-card p-8 text-center">
-          <p className="font-body" style={{ color: "var(--text-secondary)" }}>
-            No {filter} proposals found
-          </p>
-        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filtered.map((proposal, index) => (
-            <div key={proposal.publicKey.toBase58()} style={{ animationDelay: `${index * 100}ms` }}>
-              <ProposalCard proposal={proposal} onClick={() => onSelectProposal(proposal)} />
-            </div>
-          ))}
-        </div>
+        renderProposalGrid(activeSection.items)
       )}
     </div>
   );

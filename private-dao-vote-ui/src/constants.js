@@ -18,8 +18,16 @@ export const SOLANA_NETWORK = "devnet";
 export const SOLANA_RPC_URL = "https://api.devnet.solana.com";
 // export const SOLANA_RPC_URL = "https://devnet.helius-rpc.com/?api-key=YOUR_KEY";
 
+// ArcVote helper backend for read-only Arcium operations.
+// Vote encryption stays in-browser so plaintext ballot intent never leaves the client.
+export const ARCIUM_API_BASE_URL =
+  import.meta.env.VITE_ARCIUM_API_BASE_URL || "/api/arcium";
+
 // Duration options for the proposal creation modal (in seconds)
 export const DURATION_OPTIONS = [
+  { label: "5 minutes", value: 300 },
+  { label: "15 minutes", value: 900 },
+  { label: "30 minutes", value: 1800 },
   { label: "1 hour",  value: 3600 },
   { label: "6 hours", value: 21600 },
   { label: "24 hours", value: 86400 },

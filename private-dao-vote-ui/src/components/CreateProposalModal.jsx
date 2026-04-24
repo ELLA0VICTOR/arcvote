@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { AnchorProvider, Program, BN } from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import ProposalIcon from "./icons/ProposalIcon.jsx";
 import LockIcon from "./icons/LockIcon.jsx";
 import { encryptNull } from "../lib/encryption.js";
 import { fetchMXEPublicKey } from "../lib/arcium.js";
-import { PROGRAM_ID, DURATION_OPTIONS } from "../constants.js";
-import { formatAddress, randomU64 } from "../lib/solana.js";
+import { PROGRAM_ID } from "../constants.js";
+import {
+  createProgramFromProvider,
+  createProvider,
+  formatAddress,
+  randomU64,
+} from "../lib/solana.js";
 
 const STEP = {
   FORM: "form",
@@ -17,6 +22,29 @@ const STEP = {
   ERROR: "error",
 };
 
+function padDateTimePart(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toDateTimeLocalValue(date) {
+  return [
+    date.getFullYear(),
+    padDateTimePart(date.getMonth() + 1),
+    padDateTimePart(date.getDate()),
+  ].join("-") +
+    "T" +
+    [
+      padDateTimePart(date.getHours()),
+      padDateTimePart(date.getMinutes()),
+    ].join(":");
+}
+
+function getDefaultCustomEndAt() {
+  const date = new Date(Date.now() + 15 * 60 * 1000);
+  date.setSeconds(0, 0);
+  return toDateTimeLocalValue(date);
+}
+
 export default function CreateProposalModal({ onClose, onCreated, idl }) {
   const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
@@ -24,11 +52,23 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
   const [step, setStep] = useState(STEP.FORM);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [duration, setDuration] = useState(86400);
+  const [customEndAt, setCustomEndAt] = useState(getDefaultCustomEndAt);
   const [errorMessage, setErrorMessage] = useState("");
   const [txSignature, setTxSignature] = useState("");
 
   const isLoading = step === STEP.GENERATING || step === STEP.SUBMITTING;
+  const minCustomEndAt = toDateTimeLocalValue(new Date(Date.now() + 60 * 1000));
+  const selectedCustomDate = customEndAt ? new Date(customEndAt) : null;
+  const customEndPreview =
+    selectedCustomDate && !Number.isNaN(selectedCustomDate.getTime())
+      ? selectedCustomDate.toLocaleString([], {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
 
   async function handleCreate() {
     if (!title.trim() || !description.trim() || !publicKey) return;
@@ -37,12 +77,11 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
     setErrorMessage("");
 
     try {
-      const provider = new AnchorProvider(
-        connection,
+      const provider = createProvider(
         { publicKey, signTransaction, signAllTransactions },
-        { commitment: "confirmed" }
+        connection
       );
-      const program = new Program(idl, PROGRAM_ID, provider);
+      const program = createProgramFromProvider(provider, idl);
 
       const mxePublicKey = await fetchMXEPublicKey(provider, PROGRAM_ID);
       const { ciphertext, publicKey: nullPubKey, nonceU128 } = encryptNull(mxePublicKey);
@@ -50,7 +89,17 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
       setStep(STEP.SUBMITTING);
 
       const proposalId = randomU64();
-      const endTime = new BN(Math.floor(Date.now() / 1000) + duration);
+      const parsedCustomEndAt = new Date(customEndAt);
+      if (Number.isNaN(parsedCustomEndAt.getTime())) {
+        throw new Error("Select a valid end date and time.");
+      }
+
+      const endTimestamp = Math.floor(parsedCustomEndAt.getTime() / 1000);
+      if (endTimestamp <= Math.floor(Date.now() / 1000)) {
+        throw new Error("End time must be in the future.");
+      }
+
+      const endTime = new BN(endTimestamp);
 
       const [proposalPDA] = PublicKey.findProgramAddressSync(
         [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
@@ -89,21 +138,6 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
     }
   }
 
-  const stages = [
-    {
-      label: "1. Proposal metadata",
-      copy: "Title, summary, and voting window are committed onchain.",
-    },
-    {
-      label: "2. Null ballot padding",
-      copy: "ArcVote prepares encrypted empty slots for the fixed tally circuit.",
-    },
-    {
-      label: "3. Authority control",
-      copy: "The connected wallet becomes the proposal authority for tally reveal.",
-    },
-  ];
-
   return (
     <div
       className="modal-backdrop"
@@ -115,13 +149,14 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
     >
       <div className="modal-shell px-3 py-4 sm:px-4 sm:py-8">
         <div
-          className="w-full max-w-3xl animate-slide-up"
+          className="modal-panel w-full animate-slide-up"
+          style={{ maxWidth: "860px" }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="glass-card p-5 sm:p-8">
-            <div className="flex items-start gap-3 mb-6">
+          <div className="glass-card p-4 sm:p-5">
+            <div className="flex items-start gap-3 mb-4">
               <div
-                className="w-12 h-12 flex items-center justify-center flex-shrink-0"
+                className="w-10 h-10 flex items-center justify-center flex-shrink-0"
                 style={{
                   background: "var(--purple-accent)",
                   borderRadius: "4px",
@@ -156,27 +191,8 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
             </div>
 
             {step === STEP.FORM && (
-              <div className="space-y-6">
-                <div className="grid md:grid-cols-3 gap-4">
-                  {stages.map((item) => (
-                    <div key={item.label} className="glass-card p-4">
-                      <div
-                        className="text-xs font-mono mb-2"
-                        style={{ color: "var(--purple-accent)" }}
-                      >
-                        {item.label}
-                      </div>
-                      <p
-                        className="text-xs font-body leading-relaxed"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        {item.copy}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-5">
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-[minmax(0,1fr),260px] gap-3">
                   <div>
                     <label
                       className="block text-sm font-mono mb-2"
@@ -205,107 +221,74 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
                       className="block text-sm font-mono mb-2"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      Proposal Description
+                      Voting Deadline
                     </label>
-                    <textarea
-                      className="input-field w-full min-h-[144px] resize-y"
-                      value={description}
-                      onChange={(event) => setDescription(event.target.value)}
-                      placeholder="Describe the governance action, expected impact, and what token holders are deciding."
-                      maxLength={500}
+                    <input
+                      className="input-field w-full"
+                      type="datetime-local"
+                      min={minCustomEndAt}
+                      value={customEndAt}
+                      onChange={(event) => setCustomEndAt(event.target.value)}
                     />
+
                     <div
-                      className="text-xs font-mono mt-2 text-right"
+                      className="text-xs font-body mt-2"
                       style={{ color: "var(--text-secondary)" }}
                     >
-                      {description.length}/500
+                      {customEndPreview
+                        ? `Closes ${customEndPreview} (local time)`
+                        : "Select the exact closing date and time."}
                     </div>
-                  </div>
-
-                  <div>
-                    <label
-                      className="block text-sm font-mono mb-2"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      Voting Duration
-                    </label>
-                    <select
-                      className="input-field w-full"
-                      value={duration}
-                      onChange={(event) => setDuration(Number(event.target.value))}
-                    >
-                      {DURATION_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div
-                    className="p-4 flex items-start gap-3"
-                    style={{
-                      background: "rgb(255 255 255 / 0.05)",
-                      borderRadius: "12px",
-                    }}
+                <div>
+                  <label
+                    className="block text-sm font-mono mb-2"
+                    style={{ color: "var(--text-primary)" }}
                   >
-                    <LockIcon size={16} color="var(--purple-accent)" />
-                    <div>
-                      <div
-                        className="text-xs font-mono mb-1"
-                        style={{ color: "var(--purple-accent)" }}
-                      >
-                        AUTHORITY
-                      </div>
-                      <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
-                        {publicKey
-                          ? `${formatAddress(publicKey)} will initiate tallying and publish the final result.`
-                          : "Connect a wallet to assign proposal authority."}
-                      </p>
-                    </div>
-                  </div>
-
+                    Proposal Description
+                  </label>
+                  <textarea
+                    className="input-field w-full min-h-[108px] resize-y"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    placeholder="Describe the governance action, expected impact, and what token holders are deciding."
+                    maxLength={500}
+                  />
                   <div
-                    className="p-4 flex items-start gap-3"
-                    style={{
-                      background: "rgb(139 92 246 / 0.1)",
-                      border: "1px solid rgb(139 92 246 / 0.25)",
-                      borderRadius: "12px",
-                    }}
+                    className="text-xs font-mono mt-2 text-right"
+                    style={{ color: "var(--text-secondary)" }}
                   >
-                    <svg
-                      className="w-4 h-4 mt-0.5 flex-shrink-0"
-                      style={{ color: "var(--purple-accent)" }}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <div>
-                      <div
-                        className="text-xs font-mono mb-1"
-                        style={{ color: "var(--purple-accent)" }}
-                      >
-                        EXECUTION MODEL
-                      </div>
-                      <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
-                        ArcVote currently runs with a fixed 10-ballot encrypted tally
-                        circuit to keep MPC execution deterministic.
-                      </p>
-                    </div>
+                    {description.length}/500
                   </div>
                 </div>
 
                 <div
-                  className="pt-4 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 border-t"
+                  className="p-3 flex items-start gap-3"
+                  style={{
+                    background: "rgb(255 255 255 / 0.05)",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <LockIcon size={16} color="var(--purple-accent)" />
+                  <div>
+                    <div
+                      className="text-xs font-mono mb-1"
+                      style={{ color: "var(--purple-accent)" }}
+                    >
+                      AUTHORITY
+                    </div>
+                    <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
+                      {publicKey
+                        ? `${formatAddress(publicKey)} will initiate tallying and publish the final result.`
+                        : "Connect a wallet to assign proposal authority."}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="pt-3 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 border-t"
                   style={{ borderColor: "var(--border-subtle)" }}
                 >
                   <button type="button" onClick={onClose} className="btn-secondary sm:min-w-[120px]">
@@ -313,7 +296,12 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
                   </button>
                   <button
                     type="button"
-                    disabled={!title.trim() || !description.trim() || !publicKey}
+                    disabled={
+                      !title.trim() ||
+                      !description.trim() ||
+                      !publicKey ||
+                      !customEndAt
+                    }
                     onClick={handleCreate}
                     className="btn-primary flex-1"
                   >

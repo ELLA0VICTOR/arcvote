@@ -30,7 +30,7 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
       value: formatAddress(account.authority.toBase58()),
     },
     {
-      label: ended ? "Closed" : "Window",
+      label: ended ? "Closed" : "Countdown",
       value: ended ? formatDate(endTimestamp) : formatTimeRemaining(endTimestamp),
     },
     {
@@ -192,16 +192,26 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-4">
-        <div
-          className="text-xs font-mono"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          {ended && status !== "finalized"
-            ? "Awaiting authority tally"
-            : status === "finalized"
-            ? "Final result available"
-            : "Voting window open"}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <div
+            className="text-xs font-mono"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {ended && status !== "finalized"
+              ? "Awaiting authority tally"
+              : status === "finalized"
+              ? "Final result available"
+              : "Voting window open"}
+          </div>
+          {!ended && (
+            <div
+              className="text-xs font-mono"
+              style={{ color: "var(--purple-accent)" }}
+            >
+              ENDS {formatDate(endTimestamp)}
+            </div>
+          )}
         </div>
         <button
           type="button"

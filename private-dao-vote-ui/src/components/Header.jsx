@@ -1,13 +1,21 @@
-import { useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import LockIcon from "./icons/LockIcon.jsx";
+import BrandMarkIcon from "./icons/BrandMarkIcon.jsx";
 
-export default function Header({ onNavigateHome }) {
-  const { connected, publicKey } = useWallet();
-
+export default function Header({ onNavigateHome, sections = [] }) {
   return (
-    <header className="border-b" style={{ borderColor: "var(--border-subtle)" }}>
-      <div className="container mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
+    <header
+      className="border-b"
+      style={{
+        borderColor: "var(--border-subtle)",
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+        background: "rgba(10, 10, 15, 0.88)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+      }}
+    >
+      <div className="container mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={onNavigateHome}
           className="flex items-center gap-3 text-left"
@@ -20,7 +28,7 @@ export default function Header({ onNavigateHome }) {
               borderRadius: "4px",
             }}
           >
-            <LockIcon size={16} color="var(--purple-accent)" />
+            <BrandMarkIcon size={16} color="var(--purple-accent)" />
           </div>
           <div>
             <h1
@@ -35,15 +43,33 @@ export default function Header({ onNavigateHome }) {
           </div>
         </button>
 
-        <div className="flex items-center gap-4">
-          {connected && publicKey && (
-            <div className="hidden sm:flex items-center gap-2 glass-card px-4 py-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="font-mono text-sm" style={{ color: "var(--text-primary)" }}>
-                {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
-              </span>
-            </div>
-          )}
+        {sections.length > 0 && (
+          <div className="order-3 w-full lg:order-none lg:w-auto lg:flex-1 flex justify-center flex-wrap gap-2">
+            {sections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() =>
+                  document.getElementById(section.id)?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+                className="px-3 py-1 text-xs font-mono transition-all"
+                style={{
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "999px",
+                  color: "var(--text-secondary)",
+                  background: "var(--bg-secondary)",
+                }}
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-center gap-4 lg:ml-auto">
           <WalletMultiButton />
         </div>
       </div>

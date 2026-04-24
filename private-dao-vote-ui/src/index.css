@@ -23,6 +23,7 @@
 
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 104px;
   }
 }
 
@@ -128,15 +129,26 @@
     inset: 0;
     z-index: 60;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     background: rgba(0, 0, 0, 0.8);
   }
 
   .modal-shell {
-    min-height: 100%;
+    width: 100%;
+    min-height: max(100%, 100dvh);
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
     padding: 1rem;
+  }
+
+  .modal-panel {
+    width: 100%;
+    max-height: calc(100dvh - 3rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .vote-option {
@@ -248,6 +260,15 @@
 }
 
 @media (max-width: 640px) {
+  .modal-shell {
+    align-items: flex-start;
+    padding: 0.75rem;
+  }
+
+  .modal-panel {
+    max-height: calc(100dvh - 1.5rem);
+  }
+
   .wallet-adapter-button {
     font-size: 12px !important;
     padding: 0.5rem 0.75rem !important;
