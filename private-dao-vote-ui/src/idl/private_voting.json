@@ -1,0 +1,2123 @@
+{
+  "address": "HsnCFrj5K85WYKcgA4uRLUmA1TDeWqYykCUoKwQvP1aM",
+  "metadata": {
+    "name": "private_voting",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "cast_vote",
+      "docs": [
+        "Voter submits their encrypted vote. The vote ciphertext is stored on-chain",
+        "in the AllVotesStore PDA. The vote content (YES/NO) is cryptographically",
+        "opaque — nobody can read it from chain, only the Arcium MPC cluster can",
+        "decrypt it during the tally computation."
+      ],
+      "discriminator": [
+        20,
+        212,
+        15,
+        189,
+        69,
+        180,
+        69,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "voter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "all_votes_store",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  115,
+                  95,
+                  115,
+                  116,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proposal_id",
+          "type": "u64"
+        },
+        {
+          "name": "encrypted_vote",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "voter_pubkey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "create_proposal",
+      "docs": [
+        "Creates a new governance proposal PDA and its associated AllVotesStore PDA.",
+        "All 10 vote slots are pre-seeded with the null encrypted vote (plaintext=0).",
+        "This ensures the Arcis circuit always receives exactly 10 valid ciphertexts."
+      ],
+      "discriminator": [
+        132,
+        116,
+        68,
+        174,
+        216,
+        160,
+        198,
+        22
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "all_votes_store",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  115,
+                  95,
+                  115,
+                  116,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "proposal_id",
+          "type": "u64"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "name": "end_time",
+          "type": "i64"
+        },
+        {
+          "name": "null_vote_pubkey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "null_vote_ciphertext",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "null_vote_nonce",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "init_tally_votes_comp_def",
+      "docs": [
+        "Must be called once after deployment by any admin wallet.",
+        "Registers the `tally_votes` Arcis circuit on-chain so the MPC cluster",
+        "knows how to execute it."
+      ],
+      "discriminator": [
+        31,
+        249,
+        19,
+        95,
+        44,
+        255,
+        243,
+        23
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mxe_account",
+          "writable": true
+        },
+        {
+          "name": "comp_def_account",
+          "writable": true
+        },
+        {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
+        },
+        {
+          "name": "arcium_program",
+          "address": "Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "publish_tally",
+      "docs": [
+        "The authority decrypts the tally result off-chain using their x25519 private key",
+        "and submits the plaintext yes/no counts here. A sanity check ensures the counts",
+        "are internally consistent with votes_cast. After this, the proposal is Finalized",
+        "and the result is publicly visible on-chain."
+      ],
+      "discriminator": [
+        93,
+        73,
+        17,
+        135,
+        216,
+        1,
+        194,
+        250
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "proposal_id",
+          "type": "u64"
+        },
+        {
+          "name": "yes_count",
+          "type": "u32"
+        },
+        {
+          "name": "no_count",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "tally_votes",
+      "docs": [
+        "Called by the proposal authority after the voting period ends.",
+        "Builds the ArgBuilder with all 10 encrypted vote slots plus the authority's",
+        "dummy encrypted input (whose owner key encrypts the result), then calls",
+        "queue_computation to route the job to the Arcium MPC cluster.",
+        "",
+        "ArgBuilder order (CRITICAL — must match Arcis function signature exactly):",
+        "authority_dummy: pubkey → nonce → ciphertext",
+        "votes[0]:        pubkey → nonce → ciphertext",
+        "votes[1]:        pubkey → nonce → ciphertext",
+        "... (10 total vote slots)"
+      ],
+      "discriminator": [
+        144,
+        82,
+        0,
+        72,
+        160,
+        132,
+        35,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "all_votes_store",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  115,
+                  95,
+                  115,
+                  116,
+                  111,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "proposal_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sign_pda_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  65,
+                  114,
+                  99,
+                  105,
+                  117,
+                  109,
+                  83,
+                  105,
+                  103,
+                  110,
+                  101,
+                  114,
+                  65,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mxe_account"
+        },
+        {
+          "name": "mempool_account",
+          "writable": true
+        },
+        {
+          "name": "executing_pool",
+          "writable": true
+        },
+        {
+          "name": "computation_account",
+          "writable": true
+        },
+        {
+          "name": "comp_def_account"
+        },
+        {
+          "name": "cluster_account",
+          "writable": true
+        },
+        {
+          "name": "pool_account",
+          "writable": true,
+          "address": "G2sRWJvi3xoyh5k2gY49eG9L8YhAEWQPtNb1zb1GXTtC"
+        },
+        {
+          "name": "clock_account",
+          "writable": true,
+          "address": "7EbMUTLo5DjdzbN7s8BXeZwXzEwNQb1hScfRvWg8a6ot"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "arcium_program",
+          "address": "Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ"
+        }
+      ],
+      "args": [
+        {
+          "name": "proposal_id",
+          "type": "u64"
+        },
+        {
+          "name": "computation_offset",
+          "type": "u64"
+        },
+        {
+          "name": "authority_dummy_ciphertext",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "authority_pubkey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "authority_nonce",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "tally_votes_callback",
+      "docs": [
+        "Invoked by the Arcium MPC cluster after the tally_votes circuit completes.",
+        "verify_output validates the cluster's cryptographic signature over the result,",
+        "ensuring the output has not been tampered with. The encrypted result is stored",
+        "on the Proposal PDA for the authority to decrypt off-chain."
+      ],
+      "discriminator": [
+        72,
+        218,
+        189,
+        106,
+        174,
+        69,
+        95,
+        94
+      ],
+      "accounts": [
+        {
+          "name": "arcium_program",
+          "address": "Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ"
+        },
+        {
+          "name": "comp_def_account"
+        },
+        {
+          "name": "mxe_account"
+        },
+        {
+          "name": "computation_account"
+        },
+        {
+          "name": "cluster_account"
+        },
+        {
+          "name": "instructions_sysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "output",
+          "type": {
+            "defined": {
+              "name": "SignedComputationOutputs",
+              "generics": [
+                {
+                  "kind": "type",
+                  "type": {
+                    "defined": {
+                      "name": "TallyVotesOutput"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AllVotesStore",
+      "discriminator": [
+        2,
+        53,
+        34,
+        251,
+        11,
+        170,
+        201,
+        179
+      ]
+    },
+    {
+      "name": "ArciumSignerAccount",
+      "discriminator": [
+        214,
+        157,
+        122,
+        114,
+        117,
+        44,
+        214,
+        74
+      ]
+    },
+    {
+      "name": "ClockAccount",
+      "discriminator": [
+        152,
+        171,
+        158,
+        195,
+        75,
+        61,
+        51,
+        8
+      ]
+    },
+    {
+      "name": "Cluster",
+      "discriminator": [
+        236,
+        225,
+        118,
+        228,
+        173,
+        106,
+        18,
+        60
+      ]
+    },
+    {
+      "name": "ComputationDefinitionAccount",
+      "discriminator": [
+        245,
+        176,
+        217,
+        221,
+        253,
+        104,
+        172,
+        200
+      ]
+    },
+    {
+      "name": "FeePool",
+      "discriminator": [
+        172,
+        38,
+        77,
+        146,
+        148,
+        5,
+        51,
+        242
+      ]
+    },
+    {
+      "name": "MXEAccount",
+      "discriminator": [
+        103,
+        26,
+        85,
+        250,
+        179,
+        159,
+        17,
+        117
+      ]
+    },
+    {
+      "name": "Proposal",
+      "discriminator": [
+        26,
+        94,
+        189,
+        187,
+        116,
+        136,
+        53,
+        33
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ProposalCreatedEvent",
+      "discriminator": [
+        154,
+        240,
+        33,
+        66,
+        194,
+        233,
+        203,
+        209
+      ]
+    },
+    {
+      "name": "TallyCallbackEvent",
+      "discriminator": [
+        102,
+        138,
+        214,
+        146,
+        2,
+        80,
+        195,
+        61
+      ]
+    },
+    {
+      "name": "TallyFinalizedEvent",
+      "discriminator": [
+        46,
+        9,
+        16,
+        25,
+        45,
+        249,
+        169,
+        79
+      ]
+    },
+    {
+      "name": "TallyInitiatedEvent",
+      "discriminator": [
+        36,
+        61,
+        64,
+        166,
+        181,
+        88,
+        128,
+        66
+      ]
+    },
+    {
+      "name": "VoteCastEvent",
+      "discriminator": [
+        241,
+        151,
+        159,
+        134,
+        250,
+        234,
+        71,
+        234
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "TitleTooLong",
+      "msg": "Title exceeds maximum of 100 characters"
+    },
+    {
+      "code": 6001,
+      "name": "DescriptionTooLong",
+      "msg": "Description exceeds maximum of 500 characters"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidEndTime",
+      "msg": "End time must be in the future"
+    },
+    {
+      "code": 6003,
+      "name": "VotingNotActive",
+      "msg": "Voting is not currently active"
+    },
+    {
+      "code": 6004,
+      "name": "VotingEnded",
+      "msg": "Voting period has already ended"
+    },
+    {
+      "code": 6005,
+      "name": "VotingStillActive",
+      "msg": "Voting period has not yet ended — cannot tally"
+    },
+    {
+      "code": 6006,
+      "name": "MaxVotersReached",
+      "msg": "Maximum of 10 voters reached for this proposal"
+    },
+    {
+      "code": 6007,
+      "name": "AlreadyVoted",
+      "msg": "You have already cast a vote on this proposal"
+    },
+    {
+      "code": 6008,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: only the proposal authority can perform this action"
+    },
+    {
+      "code": 6009,
+      "name": "NoVotesCast",
+      "msg": "No votes have been cast — cannot tally"
+    },
+    {
+      "code": 6010,
+      "name": "TallyNotReady",
+      "msg": "MPC tally result not yet available — callback has not fired"
+    },
+    {
+      "code": 6011,
+      "name": "NotInTallyState",
+      "msg": "Proposal is not in Tallying state"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidTallyResult",
+      "msg": "Invalid tally result: yes + no counts exceed total votes cast"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidOutput",
+      "msg": "Invalid or malformed output from MPC computation"
+    }
+  ],
+  "types": [
+    {
+      "name": "Activation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "activation_epoch",
+            "type": {
+              "defined": {
+                "name": "Epoch"
+              }
+            }
+          },
+          {
+            "name": "deactivation_epoch",
+            "type": {
+              "defined": {
+                "name": "Epoch"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AllVotesStore",
+      "docs": [
+        "PDA that stores all MAX_VOTERS=10 vote slots for a single proposal.",
+        "Separate from Proposal to avoid hitting account size limits."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "u64"
+          },
+          {
+            "name": "slots",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "VoteSlot"
+                  }
+                },
+                10
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ArciumSignerAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BN254G2BLSPublicKey",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "CircuitSource",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Local",
+            "fields": [
+              {
+                "defined": {
+                  "name": "LocalCircuitSource"
+                }
+              }
+            ]
+          },
+          {
+            "name": "OnChain",
+            "fields": [
+              {
+                "defined": {
+                  "name": "OnChainCircuitSource"
+                }
+              }
+            ]
+          },
+          {
+            "name": "OffChain",
+            "fields": [
+              {
+                "defined": {
+                  "name": "OffChainCircuitSource"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClockAccount",
+      "docs": [
+        "An account storing the current network epoch"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "start_epoch",
+            "type": {
+              "defined": {
+                "name": "Epoch"
+              }
+            }
+          },
+          {
+            "name": "current_epoch",
+            "type": {
+              "defined": {
+                "name": "Epoch"
+              }
+            }
+          },
+          {
+            "name": "start_epoch_timestamp",
+            "type": {
+              "defined": {
+                "name": "Timestamp"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Cluster",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "td_info",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "NodeMetadata"
+                }
+              }
+            }
+          },
+          {
+            "name": "authority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "cluster_size",
+            "type": "u16"
+          },
+          {
+            "name": "activation",
+            "type": {
+              "defined": {
+                "name": "Activation"
+              }
+            }
+          },
+          {
+            "name": "max_capacity",
+            "type": "u64"
+          },
+          {
+            "name": "cu_price",
+            "type": "u64"
+          },
+          {
+            "name": "cu_price_proposals",
+            "type": {
+              "array": [
+                "u64",
+                32
+              ]
+            }
+          },
+          {
+            "name": "last_updated_epoch",
+            "type": {
+              "defined": {
+                "name": "Epoch"
+              }
+            }
+          },
+          {
+            "name": "nodes",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "NodeRef"
+                }
+              }
+            }
+          },
+          {
+            "name": "pending_nodes",
+            "type": {
+              "vec": "u32"
+            }
+          },
+          {
+            "name": "bls_public_key",
+            "type": {
+              "defined": {
+                "name": "SetUnset",
+                "generics": [
+                  {
+                    "kind": "type",
+                    "type": {
+                      "defined": {
+                        "name": "BN254G2BLSPublicKey"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationDefinitionAccount",
+      "docs": [
+        "An account representing a [ComputationDefinition] in a MXE."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "finalization_authority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "cu_amount",
+            "type": "u64"
+          },
+          {
+            "name": "definition",
+            "type": {
+              "defined": {
+                "name": "ComputationDefinitionMeta"
+              }
+            }
+          },
+          {
+            "name": "circuit_source",
+            "type": {
+              "defined": {
+                "name": "CircuitSource"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationDefinitionMeta",
+      "docs": [
+        "A computation definition for execution in a MXE."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "circuit_len",
+            "type": "u32"
+          },
+          {
+            "name": "signature",
+            "type": {
+              "defined": {
+                "name": "ComputationSignature"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ComputationSignature",
+      "docs": [
+        "The signature of a computation defined in a [ComputationDefinition]."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "parameters",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Parameter"
+                }
+              }
+            }
+          },
+          {
+            "name": "outputs",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Output"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Epoch",
+      "docs": [
+        "The network epoch"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          "u64"
+        ]
+      }
+    },
+    {
+      "name": "FeePool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LocalCircuitSource",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "MxeKeygen"
+          },
+          {
+            "name": "MxeKeyRecoveryInit"
+          },
+          {
+            "name": "MxeKeyRecoveryFinalize"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MXEAccount",
+      "docs": [
+        "A MPC Execution Environment."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "cluster",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "keygen_offset",
+            "type": "u64"
+          },
+          {
+            "name": "key_recovery_init_offset",
+            "type": "u64"
+          },
+          {
+            "name": "mxe_program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "utility_pubkeys",
+            "type": {
+              "defined": {
+                "name": "SetUnset",
+                "generics": [
+                  {
+                    "kind": "type",
+                    "type": {
+                      "defined": {
+                        "name": "UtilityPubkeys"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "lut_offset_slot",
+            "type": "u64"
+          },
+          {
+            "name": "computation_definitions",
+            "type": {
+              "vec": "u32"
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "MxeStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MxeStatus",
+      "docs": [
+        "The status of an MXE."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Migration"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NodeMetadata",
+      "docs": [
+        "location as [ISO 3166-1 alpha-2](https://www.iso.org/iso-3166-country-codes.html) country code"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "ip",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "peer_id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "location",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NodeRef",
+      "docs": [
+        "A reference to a node in the cluster.",
+        "The offset is to derive the Node Account.",
+        "The current_total_rewards is the total rewards the node has received so far in the current",
+        "epoch."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "offset",
+            "type": "u32"
+          },
+          {
+            "name": "current_total_rewards",
+            "type": "u64"
+          },
+          {
+            "name": "vote",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OffChainCircuitSource",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "source",
+            "type": "string"
+          },
+          {
+            "name": "hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "OnChainCircuitSource",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "is_completed",
+            "type": "bool"
+          },
+          {
+            "name": "upload_auth",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Output",
+      "docs": [
+        "An output of a computation.",
+        "We currently don't support encrypted outputs yet since encrypted values are passed via",
+        "data objects."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "PlaintextBool"
+          },
+          {
+            "name": "PlaintextU8"
+          },
+          {
+            "name": "PlaintextU16"
+          },
+          {
+            "name": "PlaintextU32"
+          },
+          {
+            "name": "PlaintextU64"
+          },
+          {
+            "name": "PlaintextU128"
+          },
+          {
+            "name": "Ciphertext"
+          },
+          {
+            "name": "ArcisX25519Pubkey"
+          },
+          {
+            "name": "PlaintextFloat"
+          },
+          {
+            "name": "PlaintextPoint"
+          },
+          {
+            "name": "PlaintextI8"
+          },
+          {
+            "name": "PlaintextI16"
+          },
+          {
+            "name": "PlaintextI32"
+          },
+          {
+            "name": "PlaintextI64"
+          },
+          {
+            "name": "PlaintextI128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Parameter",
+      "docs": [
+        "A parameter of a computation.",
+        "We differentiate between plaintext and encrypted parameters and data objects.",
+        "Plaintext parameters are directly provided as their value.",
+        "Encrypted parameters are provided as an offchain reference to the data.",
+        "Data objects are provided as a reference to the data object account."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "PlaintextBool"
+          },
+          {
+            "name": "PlaintextU8"
+          },
+          {
+            "name": "PlaintextU16"
+          },
+          {
+            "name": "PlaintextU32"
+          },
+          {
+            "name": "PlaintextU64"
+          },
+          {
+            "name": "PlaintextU128"
+          },
+          {
+            "name": "Ciphertext"
+          },
+          {
+            "name": "ArcisX25519Pubkey"
+          },
+          {
+            "name": "ArcisSignature"
+          },
+          {
+            "name": "PlaintextFloat"
+          },
+          {
+            "name": "PlaintextI8"
+          },
+          {
+            "name": "PlaintextI16"
+          },
+          {
+            "name": "PlaintextI32"
+          },
+          {
+            "name": "PlaintextI64"
+          },
+          {
+            "name": "PlaintextI128"
+          },
+          {
+            "name": "PlaintextPoint"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Proposal",
+      "docs": [
+        "Main proposal account — stores all proposal metadata and result."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "docs": [
+              "Unique identifier (caller-provided u64, e.g. timestamp or random)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Creator's pubkey — also the only key allowed to tally and publish"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "title",
+            "docs": [
+              "Human-readable title, max 100 chars"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "docs": [
+              "Human-readable description, max 500 chars"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "Unix timestamp when proposal was created"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "docs": [
+              "Unix timestamp when voting closes"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Current lifecycle state"
+            ],
+            "type": {
+              "defined": {
+                "name": "ProposalStatus"
+              }
+            }
+          },
+          {
+            "name": "votes_cast",
+            "docs": [
+              "How many vote slots have been filled (public metadata; NOT vote content)"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "max_voters",
+            "docs": [
+              "Always MAX_VOTERS = 10"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "null_vote_pubkey",
+            "docs": [
+              "x25519 public key for the null encrypted vote"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "null_vote_ciphertext",
+            "docs": [
+              "Ciphertext bytes of the null encrypted vote (plaintext=0, abstain)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "null_vote_nonce",
+            "docs": [
+              "Nonce for the null vote encryption"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "computation_offset",
+            "docs": [
+              "Offset of the queued Arcium computation"
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "tally_ciphertext",
+            "docs": [
+              "Encrypted packed tally result from MPC callback (u64 big-endian wrapped)"
+            ],
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "tally_nonce",
+            "docs": [
+              "Nonce for the tally ciphertext"
+            ],
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  16
+                ]
+              }
+            }
+          },
+          {
+            "name": "yes_count",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "no_count",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "finalized_at",
+            "type": {
+              "option": "i64"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCreatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalStatus",
+      "docs": [
+        "Current lifecycle state of a proposal."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Tallying"
+          },
+          {
+            "name": "Finalized"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SetUnset",
+      "docs": [
+        "Utility struct to store a value that needs to be set by a certain number of participants (keys",
+        "in our case). Once all participants have set the value, the value is considered set and we only",
+        "store it once."
+      ],
+      "generics": [
+        {
+          "kind": "type",
+          "name": "T"
+        }
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Set",
+            "fields": [
+              {
+                "generic": "T"
+              }
+            ]
+          },
+          {
+            "name": "Unset",
+            "fields": [
+              {
+                "generic": "T"
+              },
+              {
+                "vec": "bool"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "SharedEncryptedStruct",
+      "generics": [
+        {
+          "kind": "const",
+          "name": "LEN",
+          "type": "usize"
+        }
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "encryption_key",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "type": "u128"
+          },
+          {
+            "name": "ciphertexts",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                {
+                  "generic": "LEN"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SignedComputationOutputs",
+      "generics": [
+        {
+          "kind": "type",
+          "name": "O"
+        }
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Success",
+            "fields": [
+              {
+                "generic": "O"
+              },
+              {
+                "array": [
+                  "u8",
+                  64
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Failure"
+          },
+          {
+            "name": "MarkerForIdlBuildDoNotUseThis",
+            "fields": [
+              {
+                "generic": "O"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "TallyCallbackEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "u64"
+          },
+          {
+            "name": "encrypted_result",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TallyFinalizedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "u64"
+          },
+          {
+            "name": "yes_count",
+            "type": "u32"
+          },
+          {
+            "name": "no_count",
+            "type": "u32"
+          },
+          {
+            "name": "finalized_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TallyInitiatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "u64"
+          },
+          {
+            "name": "computation_offset",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TallyVotesOutput",
+      "docs": [
+        "The output of the callback instruction. Provided as a struct with ordered fields",
+        "as anchor does not support tuples and tuple structs yet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "field_0",
+            "type": {
+              "defined": {
+                "name": "SharedEncryptedStruct",
+                "generics": [
+                  {
+                    "kind": "const",
+                    "value": "1"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Timestamp",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "timestamp",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UtilityPubkeys",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "x25519_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "ed25519_verifying_key",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "elgamal_pubkey",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pubkey_validity_proof",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteCastEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal_id",
+            "type": "u64"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote_index",
+            "type": "u32"
+          },
+          {
+            "name": "voted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteSlot",
+      "docs": [
+        "A single vote slot inside AllVotesStore.",
+        "Slots are pre-filled with null votes so the circuit always receives exactly 10 inputs."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "encrypted_vote",
+            "docs": [
+              "RescueCipher ciphertext of the encrypted vote (32 bytes)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "voter_pubkey",
+            "docs": [
+              "Voter's ephemeral x25519 public key used for ECDH with the MXE"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Encryption nonce (u128, stored as little-endian u128 on-chain)"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "voter",
+            "docs": [
+              "Actual Solana wallet address of the voter (Pubkey::default() = empty slot)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "voted_at",
+            "docs": [
+              "Unix timestamp the vote was cast (0 = empty slot)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "is_cast",
+            "docs": [
+              "Whether this slot contains a real cast vote"
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ]
+}

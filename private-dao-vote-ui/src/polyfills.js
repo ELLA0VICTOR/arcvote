@@ -1,0 +1,6 @@
+import { Buffer } from "buffer";
+
+globalThis.Buffer = globalThis.Buffer || Buffer;
+globalThis.global = globalThis.global || globalThis;
+globalThis.process = globalThis.process || { env: {} };
+globalThis.process.env = globalThis.process.env || {};
