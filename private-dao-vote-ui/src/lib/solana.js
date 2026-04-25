@@ -247,3 +247,40 @@ export function isVotingEnded(proposal) {
 export function isVotingOpen(proposal) {
   return getProposalStatus(proposal) === "active";
 }
+
+/**
+ * Returns how the proposal controls voter eligibility.
+ *
+ * @param {object} proposal
+ * @returns {string}
+ */
+export function getProposalAccessLabel(proposal) {
+  if (proposal.isWhitelistEnabled) {
+    return `Whitelist (${proposal.allowedVoters.length})`;
+  }
+
+  return "Open Vote";
+}
+
+/**
+ * Returns whether a wallet is eligible to vote on the proposal.
+ *
+ * @param {object} proposal
+ * @param {PublicKey | null | undefined} walletPublicKey
+ * @returns {boolean}
+ */
+export function isWalletAllowedToVote(proposal, walletPublicKey) {
+  if (!walletPublicKey) {
+    return false;
+  }
+
+  if (!proposal?.isWhitelistEnabled) {
+    return true;
+  }
+
+  return proposal.allowedVoters.some((allowed) =>
+    allowed.equals
+      ? allowed.equals(walletPublicKey)
+      : new PublicKey(allowed).equals(walletPublicKey)
+  );
+}

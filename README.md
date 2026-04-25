@@ -106,13 +106,14 @@ Vote encryption intentionally stays in the browser so plaintext vote intent does
 
 - Network: `Solana Devnet`
 - Cluster offset: `456`
-- Program ID: `HsnCFrj5K85WYKcgA4uRLUmA1TDeWqYykCUoKwQvP1aM`
+- Program ID: `3MuQxYfLEAuMCN2S3XTrQDSBmqtGDwBZjb2zgjLmMA7p`
 - Circuit source:
   `https://zxfradkkhbepggmffgav.supabase.co/storage/v1/object/public/arcvote/tally_votes.arcis`
 
 ## Current Governance Model
 
 - Fixed maximum ballot count per proposal: `10`
+- Optional voter whitelist per proposal: supported
 - Vote encoding:
   - `1` = YES
   - `2` = NO

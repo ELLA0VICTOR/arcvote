@@ -4,6 +4,7 @@ import {
   formatAddress,
   formatDate,
   formatTimeRemaining,
+  getProposalAccessLabel,
   getProposalStatus,
   isVotingEnded,
 } from "../lib/solana.js";
@@ -38,8 +39,8 @@ export default function ProposalCard({ proposal, index = 0, onClick }) {
       value: `${votesCast}/${maxVoters}`,
     },
     {
-      label: "Circuit",
-      value: "Fixed 10-slot MPC",
+      label: "Access",
+      value: getProposalAccessLabel(account),
     },
   ];
 

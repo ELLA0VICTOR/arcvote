@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
@@ -6,7 +6,7 @@ import ProposalIcon from "./icons/ProposalIcon.jsx";
 import LockIcon from "./icons/LockIcon.jsx";
 import { encryptNull } from "../lib/encryption.js";
 import { fetchMXEPublicKey } from "../lib/arcium.js";
-import { PROGRAM_ID } from "../constants.js";
+import { MAX_VOTERS, PROGRAM_ID } from "../constants.js";
 import {
   createProgramFromProvider,
   createProvider,
@@ -45,6 +45,87 @@ function getDefaultCustomEndAt() {
   return toDateTimeLocalValue(date);
 }
 
+function parseWhitelistInput(value) {
+  const entries = value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!entries.length) {
+    return [];
+  }
+
+  const allowedVoters = [];
+  const seen = new Set();
+
+  for (const entry of entries) {
+    let pubkey;
+    try {
+      pubkey = new PublicKey(entry);
+    } catch {
+      throw new Error(`Invalid wallet address in whitelist: ${entry}`);
+    }
+
+    const normalized = pubkey.toBase58();
+    if (seen.has(normalized)) {
+      throw new Error(`Duplicate whitelist address: ${normalized}`);
+    }
+
+    seen.add(normalized);
+    allowedVoters.push(pubkey);
+  }
+
+  if (allowedVoters.length > MAX_VOTERS) {
+    throw new Error(
+      `This build supports up to ${MAX_VOTERS} whitelisted voters per proposal.`
+    );
+  }
+
+  return allowedVoters;
+}
+
+function parseWhitelistFile(value) {
+  const entries = value
+    .split(/[\s,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const allowedVoters = [];
+  const rejectedEntries = [];
+  const seen = new Set();
+
+  for (const entry of entries) {
+    let pubkey;
+    try {
+      pubkey = new PublicKey(entry);
+    } catch {
+      rejectedEntries.push({ value: entry, reason: "Invalid address" });
+      continue;
+    }
+
+    const normalized = pubkey.toBase58();
+    if (seen.has(normalized)) {
+      rejectedEntries.push({ value: normalized, reason: "Duplicate entry" });
+      continue;
+    }
+
+    if (allowedVoters.length >= MAX_VOTERS) {
+      rejectedEntries.push({
+        value: normalized,
+        reason: `Exceeds ${MAX_VOTERS}-wallet limit`,
+      });
+      continue;
+    }
+
+    seen.add(normalized);
+    allowedVoters.push(pubkey);
+  }
+
+  allowedVoters.sort((a, b) => a.toBase58().localeCompare(b.toBase58()));
+
+  return { allowedVoters, rejectedEntries };
+}
+
 export default function CreateProposalModal({ onClose, onCreated, idl }) {
   const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
@@ -53,8 +134,12 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [customEndAt, setCustomEndAt] = useState(getDefaultCustomEndAt);
+  const [restrictVoting, setRestrictVoting] = useState(false);
+  const [whitelistText, setWhitelistText] = useState("");
+  const [whitelistImportSummary, setWhitelistImportSummary] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [txSignature, setTxSignature] = useState("");
+  const whitelistFileInputRef = useRef(null);
 
   const isLoading = step === STEP.GENERATING || step === STEP.SUBMITTING;
   const minCustomEndAt = toDateTimeLocalValue(new Date(Date.now() + 60 * 1000));
@@ -69,6 +154,56 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
           minute: "2-digit",
         })
       : "";
+  const whitelistCount = whitelistText
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+
+  async function handleWhitelistUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const fileContents = await file.text();
+      const { allowedVoters, rejectedEntries } = parseWhitelistFile(fileContents);
+
+      setWhitelistText(allowedVoters.map((address) => address.toBase58()).join("\n"));
+      setWhitelistImportSummary({
+        fileName: file.name,
+        acceptedCount: allowedVoters.length,
+        rejectedEntries,
+      });
+
+      if (!allowedVoters.length) {
+        setErrorMessage("No valid wallet addresses were found in the uploaded file.");
+      } else {
+        setErrorMessage("");
+      }
+    } catch (error) {
+      console.error("Whitelist import error:", error);
+      setErrorMessage(error.message || "Failed to import wallet list.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function handleDownloadTemplate() {
+    const template = [
+      "wallet_address",
+      "6UjjZq8cZLepWU8UKAvB7KjcGGxrRiin9xFXgburNEWD",
+      "7TFtVd1e5DSaonVSGP73GPKe78w2EmkL5LrkjGGL6PDH",
+    ].join("\n");
+
+    const blob = new Blob([template], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "arcvote-whitelist-template.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
 
   async function handleCreate() {
     if (!title.trim() || !description.trim() || !publicKey) return;
@@ -100,6 +235,11 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
       }
 
       const endTime = new BN(endTimestamp);
+      const allowedVoters = restrictVoting ? parseWhitelistInput(whitelistText) : [];
+
+      if (restrictVoting && allowedVoters.length === 0) {
+        throw new Error("Add at least one wallet address to enable restricted voting.");
+      }
 
       const [proposalPDA] = PublicKey.findProgramAddressSync(
         [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
@@ -118,7 +258,8 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
           endTime,
           Array.from(nullPubKey),
           Array.from(ciphertext),
-          new BN(nonceU128.toString())
+          new BN(nonceU128.toString()),
+          allowedVoters
         )
         .accounts({
           payer: publicKey,
@@ -262,6 +403,136 @@ export default function CreateProposalModal({ onClose, onCreated, idl }) {
                   >
                     {description.length}/500
                   </div>
+                </div>
+
+                <div
+                  className="p-4 space-y-3"
+                  style={{
+                    background: "rgb(255 255 255 / 0.04)",
+                    border: "1px solid rgb(255 255 255 / 0.06)",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div
+                        className="text-sm font-mono mb-1"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Eligible Voters
+                      </div>
+                      <p
+                        className="text-xs font-body"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Leave this open for public participation, or restrict voting to a defined wallet set.
+                      </p>
+                    </div>
+
+                    <label
+                      className="flex items-center gap-3 text-xs font-mono"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={restrictVoting}
+                        onChange={(event) => setRestrictVoting(event.target.checked)}
+                      />
+                      Restrict voting
+                    </label>
+                  </div>
+
+                  {restrictVoting ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <input
+                          ref={whitelistFileInputRef}
+                          type="file"
+                          accept=".txt,.csv,text/plain,text/csv"
+                          onChange={handleWhitelistUpload}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          className="btn-secondary w-full sm:w-auto"
+                          onClick={() => whitelistFileInputRef.current?.click()}
+                        >
+                          Upload TXT / CSV
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary w-full sm:w-auto"
+                          onClick={handleDownloadTemplate}
+                        >
+                          Download Template
+                        </button>
+                      </div>
+
+                      <div
+                        className="text-xs font-body"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Import one wallet per line or column. ArcVote will dedupe valid entries and ignore invalid rows.
+                      </div>
+
+                      {whitelistImportSummary && (
+                        <div
+                          className="p-3 space-y-2"
+                          style={{
+                            background: "rgb(255 255 255 / 0.03)",
+                            border: "1px solid rgb(255 255 255 / 0.06)",
+                            borderRadius: "10px",
+                          }}
+                        >
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs font-mono">
+                            <span style={{ color: "var(--text-primary)" }}>
+                              IMPORTED {whitelistImportSummary.fileName.toUpperCase()}
+                            </span>
+                            <span style={{ color: "var(--purple-accent)" }}>
+                              {whitelistImportSummary.acceptedCount}/{MAX_VOTERS} accepted
+                            </span>
+                          </div>
+
+                          {whitelistImportSummary.rejectedEntries.length > 0 && (
+                            <div
+                              className="text-xs font-body"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              Rejected:{" "}
+                              {whitelistImportSummary.rejectedEntries
+                                .slice(0, 3)
+                                .map((entry) => `${entry.value} (${entry.reason})`)
+                                .join(", ")}
+                              {whitelistImportSummary.rejectedEntries.length > 3
+                                ? ` +${whitelistImportSummary.rejectedEntries.length - 3} more`
+                                : ""}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <textarea
+                        className="input-field w-full min-h-[112px] resize-y"
+                        value={whitelistText}
+                        onChange={(event) => setWhitelistText(event.target.value)}
+                        placeholder={"One wallet address per line\n6UjjZq8cZLepWU8UKAvB7KjcGGxrRiin9xFXgburNEWD"}
+                      />
+                      <div
+                        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs font-mono"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        <span>Only listed wallets can cast ballots.</span>
+                        <span>{whitelistCount}/{MAX_VOTERS} entered</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="text-xs font-mono"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      OPEN VOTE — any connected wallet can participate until the voting deadline.
+                    </div>
+                  )}
                 </div>
 
                 <div

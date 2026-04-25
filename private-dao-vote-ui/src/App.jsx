@@ -15,9 +15,12 @@ import TallyIcon from "./components/icons/TallyIcon.jsx";
 
 import {
   createProgram,
+  formatAddress,
   formatDate,
   formatTimeRemaining,
+  getProposalAccessLabel,
   getProposalStatus,
+  isWalletAllowedToVote,
   isInTallyQueue,
   isVotingEnded,
 } from "./lib/solana.js";
@@ -66,6 +69,8 @@ function ProposalDetail({
   idl,
   isAuthority,
   canVote,
+  walletConnected,
+  walletEligible,
   proposalStatus,
   votingEnded,
   onBack,
@@ -100,6 +105,10 @@ function ProposalDetail({
     {
       label: "Votes Cast",
       value: `${account.votesCast}/${account.maxVoters}`,
+    },
+    {
+      label: "Access",
+      value: getProposalAccessLabel(account),
     },
     {
       label: "Authority",
@@ -155,7 +164,7 @@ function ProposalDetail({
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
           {detailMetrics.map((metric) => (
             <div key={metric.label} className="detail-stat">
               <div className="text-xs font-mono mb-2" style={{ color: "var(--text-secondary)" }}>
@@ -167,6 +176,62 @@ function ProposalDetail({
             </div>
           ))}
         </div>
+
+        {account.isWhitelistEnabled && (
+          <div
+            className="mb-6 p-4 space-y-3"
+            style={{
+              background: "rgb(255 255 255 / 0.04)",
+              border: "1px solid rgb(255 255 255 / 0.06)",
+              borderRadius: "12px",
+            }}
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div
+                  className="text-xs font-mono mb-1"
+                  style={{ color: "var(--purple-accent)" }}
+                >
+                  ELIGIBLE VOTERS
+                </div>
+                <div
+                  className="text-sm font-body"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {account.allowedVoters.length} approved wallet
+                  {account.allowedVoters.length === 1 ? "" : "s"} can vote on this proposal.
+                </div>
+              </div>
+              <div
+                className="text-xs font-mono"
+                style={{
+                  color: walletEligible
+                    ? "var(--purple-accent)"
+                    : "var(--text-secondary)",
+                }}
+              >
+                {walletEligible ? "CONNECTED WALLET IS ELIGIBLE" : "WHITELISTED ACCESS"}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {account.allowedVoters.map((voter) => (
+                <div
+                  key={voter.toBase58()}
+                  className="px-3 py-2 text-xs font-mono"
+                  style={{
+                    background: "rgb(139 92 246 / 0.08)",
+                    border: "1px solid rgb(139 92 246 / 0.18)",
+                    borderRadius: "6px",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  {formatAddress(voter)}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!votingEnded && (
           <div
@@ -196,6 +261,30 @@ function ProposalDetail({
               style={{ color: "var(--text-secondary)" }}
             >
               ENDS {formatDate(account.endTime.toNumber())}
+            </div>
+          </div>
+        )}
+
+        {!canVote && walletConnected && proposalStatus === "active" && !votingEnded && !walletEligible && (
+          <div
+            className="p-4"
+            style={{
+              background: "rgb(255 255 255 / 0.04)",
+              border: "1px solid rgb(255 255 255 / 0.06)",
+              borderRadius: "12px",
+            }}
+          >
+            <div
+              className="text-xs font-mono mb-1"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              VOTING ACCESS
+            </div>
+            <div
+              className="text-sm font-body"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              This proposal is restricted. Connect one of the approved wallets to cast a ballot.
             </div>
           </div>
         )}
@@ -335,11 +424,15 @@ export default function App() {
     ? getProposalStatus(selectedAccount)
     : null;
   const votingEnded = selectedAccount ? isVotingEnded(selectedAccount) : false;
+  const walletEligible = selectedAccount
+    ? isWalletAllowedToVote(selectedAccount, publicKey)
+    : false;
   const canVote =
     connected &&
     selectedAccount &&
     proposalStatus === "active" &&
     !votingEnded &&
+    walletEligible &&
     selectedAccount.votesCast < selectedAccount.maxVoters;
 
   const protocolCards = [
@@ -875,9 +968,11 @@ export default function App() {
           <ProposalDetail
             proposal={selectedProposal}
             idl={idl}
-            isAuthority={isAuthority}
-            canVote={canVote}
-            proposalStatus={proposalStatus}
+          isAuthority={isAuthority}
+          canVote={canVote}
+          walletConnected={connected}
+          walletEligible={walletEligible}
+          proposalStatus={proposalStatus}
             votingEnded={votingEnded}
             onBack={navigateHome}
             onVoteClick={() => setShowVote(true)}

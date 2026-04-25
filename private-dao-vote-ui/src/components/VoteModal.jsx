@@ -11,7 +11,11 @@ import {
   getProposalPDA,
 } from "../lib/arcium.js";
 import { PROGRAM_ID } from "../constants.js";
-import { createProgramFromProvider, createProvider } from "../lib/solana.js";
+import {
+  createProgramFromProvider,
+  createProvider,
+  isWalletAllowedToVote,
+} from "../lib/solana.js";
 
 const STATE = {
   IDLE: "idle",
@@ -32,9 +36,16 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
 
   const isLoading =
     flowState === STATE.ENCRYPTING || flowState === STATE.SUBMITTING;
+  const walletAllowed = isWalletAllowedToVote(proposal, publicKey);
 
   async function handleVote() {
     if (!selected || !publicKey) return;
+
+    if (!walletAllowed) {
+      setErrorMessage("This wallet is not on the proposal whitelist.");
+      setFlowState(STATE.ERROR);
+      return;
+    }
 
     setFlowState(STATE.ENCRYPTING);
     setErrorMessage("");
@@ -205,6 +216,41 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
                   </div>
                 </div>
 
+                {proposal?.isWhitelistEnabled && (
+                  <div
+                    className="p-4"
+                    style={{
+                      background: "rgb(255 255 255 / 0.04)",
+                      border: "1px solid rgb(255 255 255 / 0.06)",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    <div
+                      className="text-xs font-mono mb-2"
+                      style={{ color: "var(--purple-accent)" }}
+                    >
+                      WHITELISTED ACCESS
+                    </div>
+                    <p
+                      className="text-sm font-body"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      This proposal only accepts ballots from {proposal.allowedVoters.length} approved wallet
+                      {proposal.allowedVoters.length === 1 ? "" : "s"}.
+                    </p>
+                    <div
+                      className="text-xs font-mono mt-2"
+                      style={{
+                        color: walletAllowed
+                          ? "var(--purple-accent)"
+                          : "rgb(248 113 113)",
+                      }}
+                    >
+                      {walletAllowed ? "CONNECTED WALLET IS ELIGIBLE" : "CONNECTED WALLET IS NOT ELIGIBLE"}
+                    </div>
+                  </div>
+                )}
+
                 <div
                   className="p-4 flex items-start gap-3"
                   style={{
@@ -238,11 +284,13 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
                   </button>
                   <button
                     type="button"
-                    disabled={!selected}
+                    disabled={!selected || !walletAllowed}
                     onClick={handleVote}
                     className="btn-primary flex-1 w-full"
                   >
-                    {selected === 1
+                    {!walletAllowed
+                      ? "Wallet Not Eligible"
+                      : selected === 1
                       ? "Encrypt and Cast YES"
                       : selected === 2
                       ? "Encrypt and Cast NO"

@@ -24,7 +24,7 @@ const COMP_DEF_OFFSET_TALLY_VOTES: u32 = comp_def_offset("tally_votes");
 
 // Temporary valid placeholder. Replace this with the real program pubkey
 // after generating the deployment keypair for arcvote.
-declare_id!("HsnCFrj5K85WYKcgA4uRLUmA1TDeWqYykCUoKwQvP1aM");
+declare_id!("3MuQxYfLEAuMCN2S3XTrQDSBmqtGDwBZjb2zgjLmMA7p");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data Types
@@ -62,6 +62,10 @@ pub struct Proposal {
     pub votes_cast: u32,
     /// Always MAX_VOTERS = 10
     pub max_voters: u32,
+    /// Whether this proposal restricts voting to a specific wallet set
+    pub is_whitelist_enabled: bool,
+    /// Optional list of wallet addresses permitted to vote
+    pub allowed_voters: Vec<Pubkey>,
     // ── Null vote data (pre-generated at creation to pad empty slots) ──
     /// x25519 public key for the null encrypted vote
     pub null_vote_pubkey: [u8; 32],
@@ -94,6 +98,8 @@ impl Proposal {
     // status (enum)  = 1
     // votes_cast     = 4
     // max_voters     = 4
+    // is_whitelist_enabled = 1
+    // allowed_voters = 4 + (MAX_VOTERS * 32)
     // null_vote_pubkey      = 32
     // null_vote_ciphertext  = 32
     // null_vote_nonce       = 16
@@ -104,7 +110,11 @@ impl Proposal {
     // no_count              = 1 + 4 = 5
     // finalized_at          = 1 + 8 = 9
     pub const LEN: usize = 8 + 8 + 32 + (4 + 100) + (4 + 500) + 8 + 8 + 1
-        + 4 + 4 + 32 + 32 + 16 + 9 + 33 + 17 + 5 + 5 + 9;
+        + 4 + 4 + 1 + (4 + (MAX_VOTERS * 32)) + 32 + 32 + 16 + 9 + 33 + 17 + 5 + 5 + 9;
+
+    pub fn is_voter_allowed(&self, voter: &Pubkey) -> bool {
+        !self.is_whitelist_enabled || self.allowed_voters.iter().any(|allowed| allowed == voter)
+    }
 }
 
 /// A single vote slot inside AllVotesStore.
@@ -182,12 +192,28 @@ pub mod private_voting {
         null_vote_pubkey: [u8; 32],
         null_vote_ciphertext: [u8; 32],
         null_vote_nonce: u128,
+        allowed_voters: Vec<Pubkey>,
     ) -> Result<()> {
         require!(title.len() <= 100, VotingError::TitleTooLong);
         require!(description.len() <= 500, VotingError::DescriptionTooLong);
+        require!(
+            allowed_voters.len() <= MAX_VOTERS,
+            VotingError::WhitelistTooLarge
+        );
 
         let clock = Clock::get()?;
         require!(end_time > clock.unix_timestamp, VotingError::InvalidEndTime);
+
+        for (index, voter) in allowed_voters.iter().enumerate() {
+            require!(
+                *voter != Pubkey::default(),
+                VotingError::InvalidWhitelistAddress
+            );
+
+            for other in allowed_voters.iter().skip(index + 1) {
+                require!(voter != other, VotingError::DuplicateWhitelistAddress);
+            }
+        }
 
         let proposal = &mut ctx.accounts.proposal;
         proposal.proposal_id = proposal_id;
@@ -199,6 +225,8 @@ pub mod private_voting {
         proposal.status = ProposalStatus::Active;
         proposal.votes_cast = 0;
         proposal.max_voters = MAX_VOTERS as u32;
+        proposal.is_whitelist_enabled = !allowed_voters.is_empty();
+        proposal.allowed_voters = allowed_voters;
         proposal.null_vote_pubkey = null_vote_pubkey;
         proposal.null_vote_ciphertext = null_vote_ciphertext;
         proposal.null_vote_nonce = null_vote_nonce;
@@ -226,6 +254,8 @@ pub mod private_voting {
             proposal_id,
             authority: ctx.accounts.payer.key(),
             end_time,
+            whitelist_enabled: proposal.is_whitelist_enabled,
+            allowed_voter_count: proposal.allowed_voters.len() as u32,
         });
 
         Ok(())
@@ -262,6 +292,10 @@ pub mod private_voting {
 
         // Prevent double voting — scan all cast slots for this wallet
         let voter_key = ctx.accounts.voter.key();
+        require!(
+            proposal.is_voter_allowed(&voter_key),
+            VotingError::VoterNotAllowed
+        );
         for slot in store.slots.iter() {
             if slot.is_cast && slot.voter == voter_key {
                 return Err(VotingError::AlreadyVoted.into());
@@ -678,6 +712,8 @@ pub struct ProposalCreatedEvent {
     pub proposal_id: u64,
     pub authority: Pubkey,
     pub end_time: i64,
+    pub whitelist_enabled: bool,
+    pub allowed_voter_count: u32,
 }
 
 #[event]
@@ -737,6 +773,14 @@ pub enum VotingError {
     VotingStillActive,
     #[msg("Maximum of 10 voters reached for this proposal")]
     MaxVotersReached,
+    #[msg("This proposal whitelist cannot contain more than 10 voter addresses")]
+    WhitelistTooLarge,
+    #[msg("A whitelist entry is invalid")]
+    InvalidWhitelistAddress,
+    #[msg("A whitelist address is duplicated")]
+    DuplicateWhitelistAddress,
+    #[msg("This wallet is not allowed to vote on the proposal")]
+    VoterNotAllowed,
     #[msg("You have already cast a vote on this proposal")]
     AlreadyVoted,
     #[msg("Unauthorized: only the proposal authority can perform this action")]

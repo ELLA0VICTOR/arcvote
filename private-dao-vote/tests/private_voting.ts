@@ -206,6 +206,125 @@ describe("private_voting — Full MPC Lifecycle", () => {
     await initTallyVotesCompDefIfNeeded();
   });
 
+  it("Only whitelisted wallets can cast votes when a proposal is restricted", async () => {
+    console.log("\n===== PRIVATE DAO VOTING — WHITELIST ENFORCEMENT TEST =====\n");
+
+    const mxePublicKey = await fetchMXEPublicKeyWithRetry(
+      provider,
+      program.programId
+    );
+
+    const nullPrivKey = x25519.utils.randomSecretKey();
+    const nullPubKey = x25519.getPublicKey(nullPrivKey);
+    const nullSharedSecret = x25519.getSharedSecret(nullPrivKey, mxePublicKey);
+    const nullCipher = new RescueCipher(nullSharedSecret);
+    const nullNonce = randomBytes(16);
+    const nullCiphertext = nullCipher.encrypt([0n], nullNonce);
+
+    const proposalId = new BN(randomBytes(8), "hex");
+    const endTime = new BN(Math.floor(Date.now() / 1000) + 120);
+
+    const [proposalPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("proposal"), proposalId.toArrayLike(Buffer, "le", 8)],
+      program.programId
+    );
+    const [voteStorePDA] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("votes_store"), proposalId.toArrayLike(Buffer, "le", 8)],
+      program.programId
+    );
+
+    const allowedVoter = anchor.web3.Keypair.generate();
+    const blockedVoter = anchor.web3.Keypair.generate();
+    await fundVoters([allowedVoter, blockedVoter]);
+
+    await program.methods
+      .createProposal(
+        proposalId,
+        "Whitelist Test Proposal",
+        "Only explicitly listed wallets should be able to cast encrypted votes on this proposal.",
+        endTime,
+        Array.from(nullPubKey),
+        Array.from(nullCiphertext[0]),
+        new BN(deserializeLE(nullNonce).toString()),
+        [allowedVoter.publicKey]
+      )
+      .accounts({
+        payer: owner.publicKey,
+        proposal: proposalPDA,
+        allVotesStore: voteStorePDA,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([owner])
+      .rpc({ commitment: "confirmed" });
+
+    const allowedPrivKey = x25519.utils.randomSecretKey();
+    const allowedPubKey = x25519.getPublicKey(allowedPrivKey);
+    const allowedSharedSecret = x25519.getSharedSecret(
+      allowedPrivKey,
+      mxePublicKey
+    );
+    const allowedCipher = new RescueCipher(allowedSharedSecret);
+    const allowedNonce = randomBytes(16);
+    const allowedEncryptedVote = allowedCipher.encrypt([1n], allowedNonce);
+
+    await program.methods
+      .castVote(
+        proposalId,
+        Array.from(allowedEncryptedVote[0]),
+        Array.from(allowedPubKey),
+        new BN(deserializeLE(allowedNonce).toString())
+      )
+      .accounts({
+        voter: allowedVoter.publicKey,
+        proposal: proposalPDA,
+        allVotesStore: voteStorePDA,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .signers([allowedVoter])
+      .rpc({ commitment: "confirmed" });
+
+    const blockedPrivKey = x25519.utils.randomSecretKey();
+    const blockedPubKey = x25519.getPublicKey(blockedPrivKey);
+    const blockedSharedSecret = x25519.getSharedSecret(
+      blockedPrivKey,
+      mxePublicKey
+    );
+    const blockedCipher = new RescueCipher(blockedSharedSecret);
+    const blockedNonce = randomBytes(16);
+    const blockedEncryptedVote = blockedCipher.encrypt([2n], blockedNonce);
+
+    let blockedError = "";
+    try {
+      await program.methods
+        .castVote(
+          proposalId,
+          Array.from(blockedEncryptedVote[0]),
+          Array.from(blockedPubKey),
+          new BN(deserializeLE(blockedNonce).toString())
+        )
+        .accounts({
+          voter: blockedVoter.publicKey,
+          proposal: proposalPDA,
+          allVotesStore: voteStorePDA,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([blockedVoter])
+        .rpc({ commitment: "confirmed" });
+    } catch (error) {
+      blockedError = `${error}`;
+    }
+
+    expect(blockedError.toLowerCase()).to.include("not allowed to vote");
+
+    const restrictedProposal = await program.account.proposal.fetch(proposalPDA);
+    expect(restrictedProposal.isWhitelistEnabled).to.equal(true);
+    expect(restrictedProposal.allowedVoters).to.have.length(1);
+    expect(restrictedProposal.allowedVoters[0].toBase58()).to.equal(
+      allowedVoter.publicKey.toBase58()
+    );
+    expect(restrictedProposal.votesCast).to.equal(1);
+  });
+
   // ── Test: Full voting lifecycle ──────────────────────────────────────────
   it("Full voting lifecycle with real Arcium MPC tally", async () => {
     console.log("\n===== PRIVATE DAO VOTING — FULL MPC LIFECYCLE TEST =====\n");
@@ -262,7 +381,8 @@ describe("private_voting — Full MPC Lifecycle", () => {
         endTime,
         Array.from(nullPubKey),
         Array.from(nullCiphertext[0]),
-        new BN(deserializeLE(nullNonce).toString())
+        new BN(deserializeLE(nullNonce).toString()),
+        []
       )
       .accounts({
         payer: owner.publicKey,

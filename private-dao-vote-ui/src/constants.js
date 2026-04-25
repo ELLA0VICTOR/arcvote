@@ -1,7 +1,7 @@
 // IMPORTANT: Replace with your deployed program ID after running `arcium deploy`.
 // This starts as a valid placeholder so the app can boot without crashing.
 export const DEFAULT_PROGRAM_ID_PLACEHOLDER = "11111111111111111111111111111111";
-export const PROGRAM_ID = "HsnCFrj5K85WYKcgA4uRLUmA1TDeWqYykCUoKwQvP1aM";
+export const PROGRAM_ID = "3MuQxYfLEAuMCN2S3XTrQDSBmqtGDwBZjb2zgjLmMA7p";
 export const IS_PROGRAM_ID_PLACEHOLDER =
   PROGRAM_ID === DEFAULT_PROGRAM_ID_PLACEHOLDER;
 

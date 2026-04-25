@@ -24,7 +24,7 @@ const PORT = Number(process.env.PORT || 8787);
 const ALLOW_ORIGIN = process.env.ARCVOTE_ALLOW_ORIGIN || "*";
 const DEFAULT_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 const DEFAULT_PROGRAM_ID =
-  process.env.PROGRAM_ID || "HsnCFrj5K85WYKcgA4uRLUmA1TDeWqYykCUoKwQvP1aM";
+  process.env.PROGRAM_ID || "3MuQxYfLEAuMCN2S3XTrQDSBmqtGDwBZjb2zgjLmMA7p";
 const DEFAULT_CLUSTER_OFFSET = Number(process.env.CLUSTER_OFFSET || 456);
 const DEFAULT_CIRCUIT_NAME = process.env.ARCIUM_CIRCUIT_NAME || "tally_votes";
 

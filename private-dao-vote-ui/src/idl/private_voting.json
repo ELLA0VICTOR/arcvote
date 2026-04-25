@@ -1,5 +1,5 @@
 {
-  "address": "HsnCFrj5K85WYKcgA4uRLUmA1TDeWqYykCUoKwQvP1aM",
+  "address": "3MuQxYfLEAuMCN2S3XTrQDSBmqtGDwBZjb2zgjLmMA7p",
   "metadata": {
     "name": "private_voting",
     "version": "0.1.0",
@@ -236,6 +236,12 @@
         {
           "name": "null_vote_nonce",
           "type": "u128"
+        },
+        {
+          "name": "allowed_voters",
+          "type": {
+            "vec": "pubkey"
+          }
         }
       ]
     },
@@ -819,36 +825,56 @@
     },
     {
       "code": 6007,
+      "name": "WhitelistTooLarge",
+      "msg": "This proposal whitelist cannot contain more than 10 voter addresses"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidWhitelistAddress",
+      "msg": "A whitelist entry is invalid"
+    },
+    {
+      "code": 6009,
+      "name": "DuplicateWhitelistAddress",
+      "msg": "A whitelist address is duplicated"
+    },
+    {
+      "code": 6010,
+      "name": "VoterNotAllowed",
+      "msg": "This wallet is not allowed to vote on the proposal"
+    },
+    {
+      "code": 6011,
       "name": "AlreadyVoted",
       "msg": "You have already cast a vote on this proposal"
     },
     {
-      "code": 6008,
+      "code": 6012,
       "name": "Unauthorized",
       "msg": "Unauthorized: only the proposal authority can perform this action"
     },
     {
-      "code": 6009,
+      "code": 6013,
       "name": "NoVotesCast",
       "msg": "No votes have been cast — cannot tally"
     },
     {
-      "code": 6010,
+      "code": 6014,
       "name": "TallyNotReady",
       "msg": "MPC tally result not yet available — callback has not fired"
     },
     {
-      "code": 6011,
+      "code": 6015,
       "name": "NotInTallyState",
       "msg": "Proposal is not in Tallying state"
     },
     {
-      "code": 6012,
+      "code": 6016,
       "name": "InvalidTallyResult",
       "msg": "Invalid tally result: yes + no counts exceed total votes cast"
     },
     {
-      "code": 6013,
+      "code": 6017,
       "name": "InvalidOutput",
       "msg": "Invalid or malformed output from MPC computation"
     }
@@ -1630,6 +1656,22 @@
             "type": "u32"
           },
           {
+            "name": "is_whitelist_enabled",
+            "docs": [
+              "Whether this proposal restricts voting to a specific wallet set"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "allowed_voters",
+            "docs": [
+              "Optional list of wallet addresses permitted to vote"
+            ],
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
             "name": "null_vote_pubkey",
             "docs": [
               "x25519 public key for the null encrypted vote"
@@ -1734,6 +1776,14 @@
           {
             "name": "end_time",
             "type": "i64"
+          },
+          {
+            "name": "whitelist_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "allowed_voter_count",
+            "type": "u32"
           }
         ]
       }
