@@ -46,28 +46,40 @@ This means ArcVote does not trust a single backend, validator, or coordinator to
 
 Important note: ArcVote protects ballot direction, not wallet anonymity. Participation can still be discovered from onchain activity.
 
-## n8n-Style Workflow
+## System Flow
 
 ```mermaid
 flowchart LR
-    classDef surface fill:#12101c,stroke:#7c3aed,color:#f5f2ff,stroke-width:1px;
-    classDef state fill:#181621,stroke:#413a67,color:#d8d3ef,stroke-width:1px;
+    classDef user fill:#12101c,stroke:#7c3aed,color:#f5f2ff,stroke-width:1px;
+    classDef solana fill:#181621,stroke:#413a67,color:#d8d3ef,stroke-width:1px;
     classDef arcium fill:#171326,stroke:#8b5cf6,color:#efe8ff,stroke-width:2px;
     classDef result fill:#141d1c,stroke:#22c55e,color:#e9fff5,stroke-width:1px;
 
-    A[Draft Proposal]:::surface --> B[Create Proposal PDA]:::state
-    B --> C[Initialize Fixed Ballot Store<br/>10 encrypted slots]:::state
+    subgraph Creator["Proposal setup"]
+        A[Creator drafts proposal]:::user
+        B[Create proposal account]:::solana
+        C[Open encrypted ballot slots]:::solana
+        A --> B --> C
+    end
 
-    D[Wallet Chooses Vote]:::surface --> E[Encrypt Vote In Browser<br/>x25519 + RescueCipher]:::arcium
-    E --> F[Submit Ciphertext Ballot]:::state
+    subgraph Voter["Private voting"]
+        D[Voter selects YES or NO]:::user
+        E[Browser encrypts ballot<br/>x25519 + RescueCipher]:::arcium
+        F[Submit ciphertext vote]:::solana
+        D --> E --> F
+    end
+
+    subgraph Finalize["Tally and reveal"]
+        G[Deadline reached]:::user
+        H[Authority queues tally]:::solana
+        I[Arcium MXE runs MPC tally]:::arcium
+        J[Callback verified onchain]:::solana
+        K[Aggregate result published]:::result
+        G --> H --> I --> J --> K
+    end
+
     F --> C
-
-    C --> G[Proposal Deadline Reached]:::surface
-    G --> H[Authority Queues Tally]:::state
-    H --> I[Arcium MXE]:::arcium
-    I --> J[Encrypted MPC Tally Execution]:::arcium
-    J --> K[Callback Output Verified Onchain]:::state
-    K --> L[Publish Aggregate Result]:::result
+    C --> G
 ```
 
 ## Architecture
