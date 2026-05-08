@@ -161,7 +161,7 @@ Open `http://localhost:5173`.
 5. Trigger MPC finalization with the authority wallet.
 6. Publish the verified aggregate result.
 
-## What Judges Should Look For
+## Implementation Highlights
 
 - Real Arcium integration, not mocked privacy
 - Client-side ballot encryption before transaction submission

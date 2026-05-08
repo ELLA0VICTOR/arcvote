@@ -37,3 +37,4 @@ private-dao-vote-ui/dist/
 **/*.p12
 **/*.pfx
 **/*mnemonic*
+tmp_patch_*.js
