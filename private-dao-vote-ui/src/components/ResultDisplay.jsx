@@ -5,11 +5,15 @@ export default function ResultDisplay({ proposal }) {
   const totalVotes = Math.max(votesCast, 1);
   const yesPercentage = Math.round((yesCount / totalVotes) * 100);
   const noPercentage = Math.round((noCount / totalVotes) * 100);
+  const tied = yesCount === noCount;
   const passed = yesCount > noCount;
 
   const yesTone = "var(--purple-accent)";
   const noTone = "rgb(248 113 113)";
-  const outcomeTone = passed ? "rgb(74 222 128)" : "rgb(248 113 113)";
+  const tieTone = "rgb(250 204 21)";
+  const outcomeTone = tied ? tieTone : passed ? "rgb(74 222 128)" : "rgb(248 113 113)";
+  const outcomeLabel = tied ? "TIED" : passed ? "PASSED" : "REJECTED";
+  const finalOutcome = tied ? "TIE" : passed ? "YES" : "NO";
   const yesWidth = yesCount > 0 ? `${yesPercentage}%` : "0%";
   const noWidth = noCount > 0 ? `${noPercentage}%` : "0%";
 
@@ -37,11 +41,15 @@ export default function ResultDisplay({ proposal }) {
             style={{
               color: outcomeTone,
               border: `1px solid ${outcomeTone}33`,
-              background: passed ? "rgb(34 197 94 / 0.08)" : "rgb(239 68 68 / 0.08)",
+              background: tied
+                ? "rgb(250 204 21 / 0.08)"
+                : passed
+                  ? "rgb(34 197 94 / 0.08)"
+                  : "rgb(239 68 68 / 0.08)",
               borderRadius: "2px",
             }}
           >
-            {passed ? "PASSED" : "REJECTED"}
+            {outcomeLabel}
           </div>
         </div>
 
@@ -181,9 +189,9 @@ export default function ResultDisplay({ proposal }) {
             </div>
             <div
               className="text-2xl font-display font-bold"
-              style={{ color: passed ? yesTone : noTone }}
+              style={{ color: tied ? tieTone : passed ? yesTone : noTone }}
             >
-              {passed ? "YES" : "NO"}
+              {finalOutcome}
             </div>
           </div>
 
