@@ -36,10 +36,20 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
 
   const isLoading =
     flowState === STATE.ENCRYPTING || flowState === STATE.SUBMITTING;
+  const isAuthority = Boolean(
+    publicKey && proposal?.authority?.toBase58?.() === publicKey.toBase58()
+  );
   const walletAllowed = isWalletAllowedToVote(proposal, publicKey);
+  const canSubmitVote = walletAllowed && !isAuthority;
 
   async function handleVote() {
     if (!selected || !publicKey) return;
+
+    if (isAuthority) {
+      setErrorMessage("Proposal authority cannot vote on their own proposal.");
+      setFlowState(STATE.ERROR);
+      return;
+    }
 
     if (!walletAllowed) {
       setErrorMessage("This wallet is not on the proposal whitelist.");
@@ -251,6 +261,27 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
                   </div>
                 )}
 
+                {isAuthority && (
+                  <div
+                    className="p-4"
+                    style={{
+                      background: "rgb(248 113 113 / 0.1)",
+                      border: "1px solid rgb(248 113 113 / 0.25)",
+                      borderRadius: "12px",
+                    }}
+                  >
+                    <div
+                      className="text-xs font-mono mb-2"
+                      style={{ color: "rgb(248 113 113)" }}
+                    >
+                      AUTHORITY VOTING LOCK
+                    </div>
+                    <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
+                      Proposal authorities cannot vote on their own proposals in this neutrality model.
+                    </p>
+                  </div>
+                )}
+
                 <div
                   className="p-4 flex items-start gap-3"
                   style={{
@@ -284,11 +315,13 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
                   </button>
                   <button
                     type="button"
-                    disabled={!selected || !walletAllowed}
+                    disabled={!selected || !canSubmitVote}
                     onClick={handleVote}
                     className="btn-primary flex-1 w-full"
                   >
-                    {!walletAllowed
+                    {isAuthority
+                      ? "Authority Cannot Vote"
+                      : !walletAllowed
                       ? "Wallet Not Eligible"
                       : selected === 1
                       ? "Encrypt and Cast YES"

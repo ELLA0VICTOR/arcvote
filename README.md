@@ -126,6 +126,7 @@ Vote encryption intentionally stays in the browser so plaintext vote intent does
 
 - Fixed maximum ballot count per proposal: `10`
 - Optional voter whitelist per proposal: supported
+- Proposal authority cannot vote on their own proposal in the default neutrality model
 - Vote encoding:
   - `1` = YES
   - `2` = NO
@@ -168,7 +169,7 @@ Open `http://localhost:5173`.
 
 1. Connect a devnet wallet.
 2. Create a proposal with a short deadline.
-3. Cast encrypted votes from one or more devnet wallets.
+3. Cast encrypted votes from one or more non-authority devnet wallets.
 4. Wait for the voting deadline to expire.
 5. Trigger MPC finalization with the authority wallet.
 6. Publish the verified aggregate result.

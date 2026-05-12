@@ -289,6 +289,30 @@ function ProposalDetail({
           </div>
         )}
 
+        {!canVote && walletConnected && proposalStatus === "active" && !votingEnded && isAuthority && (
+          <div
+            className="p-4"
+            style={{
+              background: "rgb(248 113 113 / 0.1)",
+              border: "1px solid rgb(248 113 113 / 0.25)",
+              borderRadius: "12px",
+            }}
+          >
+            <div
+              className="text-xs font-mono mb-1"
+              style={{ color: "rgb(248 113 113)" }}
+            >
+              AUTHORITY VOTING LOCK
+            </div>
+            <div
+              className="text-sm font-body"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Proposal authorities cannot vote on their own proposals in this neutrality model.
+            </div>
+          </div>
+        )}
+
       </div>
 
       <div className="space-y-6">
@@ -432,6 +456,7 @@ export default function App() {
     selectedAccount &&
     proposalStatus === "active" &&
     !votingEnded &&
+    !isAuthority &&
     walletEligible &&
     selectedAccount.votesCast < selectedAccount.maxVoters;
 

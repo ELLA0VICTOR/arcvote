@@ -293,6 +293,10 @@ pub mod private_voting {
         // Prevent double voting — scan all cast slots for this wallet
         let voter_key = ctx.accounts.voter.key();
         require!(
+            voter_key != proposal.authority,
+            VotingError::AuthorityCannotVote
+        );
+        require!(
             proposal.is_voter_allowed(&voter_key),
             VotingError::VoterNotAllowed
         );
@@ -785,6 +789,8 @@ pub enum VotingError {
     AlreadyVoted,
     #[msg("Unauthorized: only the proposal authority can perform this action")]
     Unauthorized,
+    #[msg("Proposal authority cannot vote on their own proposal")]
+    AuthorityCannotVote,
     #[msg("No votes have been cast — cannot tally")]
     NoVotesCast,
     #[msg("MPC tally result not yet available — callback has not fired")]

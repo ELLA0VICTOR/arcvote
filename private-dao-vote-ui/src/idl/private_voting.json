@@ -855,26 +855,31 @@
     },
     {
       "code": 6013,
+      "name": "AuthorityCannotVote",
+      "msg": "Proposal authority cannot vote on their own proposal"
+    },
+    {
+      "code": 6014,
       "name": "NoVotesCast",
       "msg": "No votes have been cast — cannot tally"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "TallyNotReady",
       "msg": "MPC tally result not yet available — callback has not fired"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "NotInTallyState",
       "msg": "Proposal is not in Tallying state"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "InvalidTallyResult",
       "msg": "Invalid tally result: yes + no counts exceed total votes cast"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "InvalidOutput",
       "msg": "Invalid or malformed output from MPC computation"
     }
