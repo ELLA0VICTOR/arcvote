@@ -1,7 +1,14 @@
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import BrandMarkIcon from "./icons/BrandMarkIcon.jsx";
 
-export default function Header({ onNavigateHome, sections = [] }) {
+const NAV_ITEMS = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "vote", label: "Vote" },
+  { id: "history", label: "Vote History" },
+  { id: "faq", label: "FAQ" },
+];
+
+export default function Header({ activeTab, onNavigateHome, onNavigate }) {
   return (
     <header
       className="border-b"
@@ -43,31 +50,29 @@ export default function Header({ onNavigateHome, sections = [] }) {
           </div>
         </button>
 
-        {sections.length > 0 && (
-          <div className="order-3 w-full lg:order-none lg:w-auto lg:flex-1 flex justify-center flex-wrap gap-2">
-            {sections.map((section) => (
+        <nav className="order-3 w-full lg:order-none lg:w-auto lg:flex-1 flex justify-center flex-wrap gap-2">
+          {NAV_ITEMS.map((section) => {
+            const isActive = activeTab === section.id;
+            return (
               <button
                 key={section.id}
                 type="button"
-                onClick={() =>
-                  document.getElementById(section.id)?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  })
-                }
+                onClick={() => onNavigate(section.id)}
                 className="px-3 py-1 text-xs font-mono transition-all"
                 style={{
-                  border: "1px solid var(--border-subtle)",
+                  border: isActive
+                    ? "1px solid var(--purple-accent)"
+                    : "1px solid var(--border-subtle)",
                   borderRadius: "999px",
-                  color: "var(--text-secondary)",
-                  background: "var(--bg-secondary)",
+                  color: isActive ? "white" : "var(--text-secondary)",
+                  background: isActive ? "var(--purple-accent)" : "var(--bg-secondary)",
                 }}
               >
                 {section.label}
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </nav>
 
         <div className="flex items-center gap-4 lg:ml-auto w-full sm:w-auto justify-end">
           <WalletMultiButton />

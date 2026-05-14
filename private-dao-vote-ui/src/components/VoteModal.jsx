@@ -25,7 +25,7 @@ const STATE = {
   ERROR: "error",
 };
 
-export default function VoteModal({ proposal, proposalId, onClose, idl }) {
+export default function VoteModal({ proposal, proposalId, onClose, onVoted, idl }) {
   const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
 
@@ -98,6 +98,14 @@ export default function VoteModal({ proposal, proposalId, onClose, idl }) {
 
       setTxSignature(signature);
       setFlowState(STATE.DONE);
+      onVoted?.({
+        proposalId: proposalId.toString(),
+        proposalTitle: proposal?.title || "Proposal",
+        voter: publicKey.toBase58(),
+        txSignature: signature,
+        timestamp: Date.now(),
+        status: "Recorded",
+      });
     } catch (error) {
       console.error("Vote submission error:", error);
       setErrorMessage(error.message || "Transaction failed");

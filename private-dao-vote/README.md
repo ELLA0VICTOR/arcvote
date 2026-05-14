@@ -56,6 +56,15 @@ ArcVote protects ballot direction, not wallet anonymity. A wallet that submits a
 
 The fixed ballot capacity is intentional. The Arcis circuit is compiled with a fixed input structure, so unused ballot slots are padded with encrypted zero values.
 
+## Whitelist Voting
+
+ArcVote supports proposal-level allowlists for private DAO votes.
+
+- `create_proposal(... allowed_voters ...)` stores approved voter addresses on the proposal. If the list is non-empty, whitelist mode is enabled for that proposal.
+- `cast_vote(...)` checks the connected wallet with `proposal.is_voter_allowed(&voter_key)` before accepting an encrypted ballot.
+- Wallets outside the allowlist are rejected with `VoterNotAllowed`.
+- The proposal authority is blocked from voting on their own proposal to keep the default flow neutral.
+
 ## Build
 
 Use WSL or Linux for Arcium development.

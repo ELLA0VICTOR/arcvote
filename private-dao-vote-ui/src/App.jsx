@@ -13,8 +13,11 @@ import LockIcon from "./components/icons/LockIcon.jsx";
 import ShieldIcon from "./components/icons/ShieldIcon.jsx";
 import TallyIcon from "./components/icons/TallyIcon.jsx";
 
+import { getVoteStorePDA } from "./lib/arcium.js";
 import {
   createProgram,
+  explorerUrl,
+  fetchAllProposals,
   formatAddress,
   formatDate,
   formatTimeRemaining,
@@ -39,6 +42,73 @@ async function loadIdl() {
     console.error("[ARCVOTE] Failed to load IDL:", error);
     return null;
   }
+}
+
+const VOTE_HISTORY_STORAGE_KEY = "arcvote:vote-history:v1";
+const MAX_STORED_VOTE_RECORDS = 200;
+
+const FAQ_ITEMS = [
+  {
+    id: "privacy",
+    question: "Can people see how I voted?",
+    answer:
+      "No. ArcVote encrypts the YES/NO choice in the browser before submission. The chain can see that a wallet participated, but not the ballot direction.",
+  },
+  {
+    id: "whitelist",
+    question: "How does whitelist voting work?",
+    answer:
+      "When a proposal is created with allowed voters, the on-chain cast_vote instruction checks the connected wallet against that whitelist and rejects every other address.",
+  },
+  {
+    id: "authority",
+    question: "Can the proposal creator vote?",
+    answer:
+      "No. This neutrality model blocks the proposal authority from voting on their own proposal, even if the proposal is otherwise open.",
+  },
+  {
+    id: "tally",
+    question: "When is the result revealed?",
+    answer:
+      "After the voting deadline, the authority triggers Arcium MPC tallying. Only the aggregate YES/NO result is published after the callback is verified.",
+  },
+];
+
+function readStoredVoteHistory() {
+  try {
+    const rawHistory = window.localStorage.getItem(VOTE_HISTORY_STORAGE_KEY);
+    const parsedHistory = rawHistory ? JSON.parse(rawHistory) : [];
+    return Array.isArray(parsedHistory) ? parsedHistory : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredVoteHistory(records) {
+  try {
+    window.localStorage.setItem(
+      VOTE_HISTORY_STORAGE_KEY,
+      JSON.stringify(records.slice(0, MAX_STORED_VOTE_RECORDS))
+    );
+  } catch {
+    // Vote history is a local convenience layer; on-chain voting still works without it.
+  }
+}
+
+function getVoteHistoryKey(record) {
+  if (record?.txSignature) return record.txSignature;
+  return `${record?.proposalId || "proposal"}:${record?.voter || "wallet"}:${record?.timestamp || "vote"}`;
+}
+
+function getVoteHistoryIdentityKey(record) {
+  return `${record?.proposalId || "proposal"}:${record?.voter || "wallet"}`;
+}
+
+function toNumber(value) {
+  if (value && typeof value.toNumber === "function") {
+    return value.toNumber();
+  }
+  return Number(value ?? 0);
 }
 
 function SetupState() {
@@ -333,16 +403,166 @@ function ProposalDetail({
   );
 }
 
+function VoteHistoryPage({ records, proposalsById, connected }) {
+  const sortedRows = [...records].sort(
+    (a, b) => Number(b.timestamp ?? 0) - Number(a.timestamp ?? 0)
+  );
+
+  if (!connected) {
+    return (
+      <section className="glass-card p-8 sm:p-12 animate-fade-in">
+        <div className="max-w-2xl">
+          <div className="text-sm font-mono mb-3" style={{ color: "var(--purple-accent)" }}>
+            VOTE HISTORY
+          </div>
+          <h2 className="text-3xl font-display font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+            Connect wallet to view your encrypted vote transactions.
+          </h2>
+          <p className="font-body" style={{ color: "var(--text-secondary)" }}>
+            Vote history is scoped to the connected wallet.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="glass-card p-5 sm:p-8 animate-fade-in">
+      <div className="mb-6">
+        <div className="text-sm font-mono mb-2" style={{ color: "var(--purple-accent)" }}>
+          VOTE HISTORY
+        </div>
+        <h2 className="text-2xl sm:text-3xl font-display font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+          Past encrypted vote transactions
+        </h2>
+        <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
+          Each row is one encrypted ballot submitted by this wallet. Direction is intentionally not displayed.
+          Transaction links appear when the vote was captured by this browser; otherwise the row is derived from on-chain vote-store state.
+        </p>
+      </div>
+
+      {!sortedRows.length ? (
+        <div className="p-8 text-center" style={{ border: "1px solid var(--border-subtle)", borderRadius: "4px" }}>
+          <h3 className="text-xl font-display font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+            No vote transactions yet
+          </h3>
+          <p className="text-sm font-body" style={{ color: "var(--text-secondary)" }}>
+            Cast an encrypted vote and it will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <div className="min-w-[760px]">
+            <div
+              className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-3 text-xs font-mono"
+              style={{ color: "var(--text-secondary)", borderBottom: "1px solid var(--border-subtle)" }}
+            >
+              <span>Proposal</span>
+              <span>Ballot</span>
+              <span>Status</span>
+              <span>Time</span>
+              <span>Transaction</span>
+            </div>
+            {sortedRows.map((record) => {
+              const proposal = proposalsById.get(String(record.proposalId));
+              const status = proposal
+                ? getProposalStatus(proposal.account)
+                : record.status || "Recorded";
+              return (
+                <div
+                  key={getVoteHistoryKey(record)}
+                  className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-4 text-sm font-mono"
+                  style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-primary)" }}
+                >
+                  <span className="truncate">{record.proposalTitle || proposal?.account?.title || "Proposal"}</span>
+                  <span>Encrypted ballot</span>
+                  <span>{String(status).replaceAll("_", " ")}</span>
+                  <span>{record.timestamp ? new Date(record.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Unknown"}</span>
+                  <span>
+                    {record.txSignature ? (
+                      <a
+                        href={explorerUrl(record.txSignature)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "var(--purple-accent)" }}
+                      >
+                        {formatAddress(record.txSignature)}
+                      </a>
+                    ) : (
+                      "On-chain only"
+                    )}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function FaqPage() {
+  const [openFaqId, setOpenFaqId] = useState(FAQ_ITEMS[0].id);
+
+  return (
+    <section className="space-y-6 animate-fade-in">
+      <div className="glass-card p-6 sm:p-8">
+        <div className="text-sm font-mono mb-2" style={{ color: "var(--purple-accent)" }}>
+          FAQ
+        </div>
+        <h2 className="text-3xl sm:text-4xl font-display font-bold mb-3" style={{ color: "var(--text-primary)" }}>
+          ArcVote questions
+        </h2>
+        <p className="text-sm font-body max-w-2xl" style={{ color: "var(--text-secondary)" }}>
+          Fast answers for private voting, whitelists, authority locks, and MPC tallying.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {FAQ_ITEMS.map((item) => {
+          const isOpen = openFaqId === item.id;
+          return (
+            <article key={item.id} className="glass-card overflow-hidden">
+              <button
+                type="button"
+                className="w-full p-5 text-left flex items-center justify-between gap-4"
+                onClick={() => setOpenFaqId(isOpen ? null : item.id)}
+              >
+                <span className="font-display font-bold text-lg" style={{ color: "var(--text-primary)" }}>
+                  {item.question}
+                </span>
+                <span className="font-mono" style={{ color: "var(--purple-accent)" }}>
+                  {isOpen ? "-" : "+"}
+                </span>
+              </button>
+              {isOpen && (
+                <div className="px-5 pb-5 text-sm font-body leading-7" style={{ color: "var(--text-secondary)" }}>
+                  {item.answer}
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const { publicKey, connected, signTransaction, signAllTransactions } = useWallet();
   const { connection } = useConnection();
 
   const [idl, setIdl] = useState(null);
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [page, setPage] = useState("list");
   const [selectedProposal, setSelectedProposal] = useState(null);
   const [showVote, setShowVote] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [allProposals, setAllProposals] = useState([]);
+  const [voteHistoryRecords, setVoteHistoryRecords] = useState(readStoredVoteHistory);
+  const [chainVoteHistoryRecords, setChainVoteHistoryRecords] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -359,10 +579,133 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!idl) return undefined;
+
+    let isCancelled = false;
+
+    const walletInterface = connected && publicKey
+      ? { publicKey, signTransaction, signAllTransactions }
+      : undefined;
+
+    async function refreshProposalStats() {
+      try {
+        const program = createProgram(walletInterface, connection, idl);
+        const proposals = await fetchAllProposals(program);
+        if (isCancelled) return;
+
+        setAllProposals(proposals);
+        setStats({
+          total: proposals.length,
+          active: proposals.filter((item) => getProposalStatus(item.account) === "active").length,
+          tallying: proposals.filter((item) => isInTallyQueue(item.account)).length,
+          finalized: proposals.filter((item) => getProposalStatus(item.account) === "finalized").length,
+        });
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Failed to refresh proposal stats:", error);
+        }
+      }
+    }
+
+    refreshProposalStats();
+    const intervalId = window.setInterval(refreshProposalStats, 12000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    idl,
+    refreshNonce,
+    connection,
+    connected,
+    publicKey,
+    signTransaction,
+    signAllTransactions,
+  ]);
+
+  useEffect(() => {
+    if (!idl || !connected || !publicKey || allProposals.length === 0) {
+      setChainVoteHistoryRecords([]);
+      return undefined;
+    }
+
+    let isCancelled = false;
+    const walletAddress = publicKey.toBase58();
+
+    const walletInterface = {
+      publicKey,
+      signTransaction,
+      signAllTransactions,
+    };
+
+    async function refreshChainVoteHistory() {
+      try {
+        const program = createProgram(walletInterface, connection, idl);
+        const records = [];
+
+        await Promise.all(
+          allProposals.map(async (proposal) => {
+            try {
+              const proposalId = proposal.account.proposalId;
+              const voteStorePda = getVoteStorePDA(proposalId);
+              const voteStore = await program.account.allVotesStore.fetch(voteStorePda);
+
+              const matchingSlot = voteStore.slots.find((slot) => {
+                const voter = slot.voter?.toBase58?.();
+                const isCast = Boolean(slot.isCast ?? slot.is_cast);
+                return isCast && voter === walletAddress;
+              });
+
+              if (!matchingSlot) return;
+
+              const votedAt = toNumber(matchingSlot.votedAt ?? matchingSlot.voted_at);
+
+              records.push({
+                proposalId: proposalId.toString(),
+                proposalTitle: proposal.account.title,
+                voter: walletAddress,
+                txSignature: "",
+                timestamp: votedAt > 0 ? votedAt * 1000 : 0,
+                status: "On-chain",
+              });
+            } catch (error) {
+              console.error("Failed to read vote store:", error);
+            }
+          })
+        );
+
+        if (!isCancelled) {
+          setChainVoteHistoryRecords(records);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Failed to refresh on-chain vote history:", error);
+        }
+      }
+    }
+
+    refreshChainVoteHistory();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    idl,
+    connected,
+    publicKey,
+    signTransaction,
+    signAllTransactions,
+    connection,
+    allProposals,
+  ]);
+
+  useEffect(() => {
     function onHash() {
       const hash = window.location.hash;
       if (hash.startsWith("#/proposal/")) {
         setPage("detail");
+        setActiveTab("vote");
       } else {
         setPage("list");
         setSelectedProposal(null);
@@ -431,13 +774,44 @@ export default function App() {
   function navigateToProposal(proposal) {
     setSelectedProposal(proposal);
     setPage("detail");
+    setActiveTab("vote");
     window.location.hash = `#/proposal/${proposal.publicKey.toBase58()}`;
   }
 
   function navigateHome() {
+    setActiveTab("dashboard");
     setPage("list");
     setSelectedProposal(null);
     window.location.hash = "#/";
+  }
+
+  function navigateToTab(tabId) {
+    setActiveTab(tabId);
+    if (tabId !== "vote") {
+      setPage("list");
+      setSelectedProposal(null);
+      window.location.hash = "#/";
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function navigateVoteList() {
+    setActiveTab("vote");
+    setPage("list");
+    setSelectedProposal(null);
+    window.location.hash = "#/";
+  }
+
+  function handleVoteRecorded(record) {
+    setVoteHistoryRecords((current) => {
+      const next = [
+        record,
+        ...current.filter((item) => getVoteHistoryKey(item) !== getVoteHistoryKey(record)),
+      ].slice(0, MAX_STORED_VOTE_RECORDS);
+
+      writeStoredVoteHistory(next);
+      return next;
+    });
   }
 
   const selectedAccount = selectedProposal?.account;
@@ -585,14 +959,42 @@ export default function App() {
     },
   ];
 
+  const connectedWallet = publicKey?.toBase58();
+  const localWalletVoteHistoryRecords = connectedWallet
+    ? voteHistoryRecords.filter((record) => record.voter === connectedWallet)
+    : [];
+  const localVoteIdentityKeys = new Set(
+    localWalletVoteHistoryRecords.map(getVoteHistoryIdentityKey)
+  );
+  const walletVoteHistoryRecords = connectedWallet
+    ? [
+        ...localWalletVoteHistoryRecords,
+        ...chainVoteHistoryRecords.filter(
+          (record) =>
+            record.voter === connectedWallet &&
+            !localVoteIdentityKeys.has(getVoteHistoryIdentityKey(record))
+        ),
+      ]
+    : [];
+  const proposalsById = new Map(
+    allProposals.map((proposal) => [
+      proposal.account.proposalId.toString(),
+      proposal,
+    ])
+  );
+
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
-      <Header onNavigateHome={navigateHome} />
+      <Header
+        activeTab={activeTab}
+        onNavigateHome={navigateHome}
+        onNavigate={navigateToTab}
+      />
 
       <main className="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {setupRequired ? (
           <SetupState />
-        ) : page === "list" ? (
+        ) : activeTab === "dashboard" ? (
           <>
             <div id="overview" className="mb-16 sm:mb-24 animate-fade-in">
               <div className="grid xl:grid-cols-[minmax(0,1fr),500px] gap-8 sm:gap-10 items-start">
@@ -654,7 +1056,10 @@ export default function App() {
                   <div className="flex flex-col sm:flex-row gap-3 sm:flex-wrap">
                     {connected && (
                       <button
-                        onClick={() => setShowCreate(true)}
+                        onClick={() => {
+                          setActiveTab("vote");
+                          setShowCreate(true);
+                        }}
                         className="btn-primary w-full sm:w-auto animate-scale-in animation-delay-200"
                       >
                         Create Proposal
@@ -980,7 +1385,23 @@ export default function App() {
                 ))}
               </div>
             </div>
-
+          </>
+        ) : activeTab === "vote" ? (
+          page === "detail" ? (
+            <ProposalDetail
+              proposal={selectedProposal}
+              idl={idl}
+              isAuthority={isAuthority}
+              canVote={canVote}
+              walletConnected={connected}
+              walletEligible={walletEligible}
+              proposalStatus={proposalStatus}
+              votingEnded={votingEnded}
+              onBack={navigateVoteList}
+              onVoteClick={() => setShowVote(true)}
+              onTallyComplete={() => setRefreshNonce((value) => value + 1)}
+            />
+          ) : (
             <ProposalList
               idl={idl}
               refreshNonce={refreshNonce}
@@ -988,21 +1409,15 @@ export default function App() {
               onSelectProposal={navigateToProposal}
               onStatsChange={setStats}
             />
-          </>
-        ) : (
-          <ProposalDetail
-            proposal={selectedProposal}
-            idl={idl}
-          isAuthority={isAuthority}
-          canVote={canVote}
-          walletConnected={connected}
-          walletEligible={walletEligible}
-          proposalStatus={proposalStatus}
-            votingEnded={votingEnded}
-            onBack={navigateHome}
-            onVoteClick={() => setShowVote(true)}
-            onTallyComplete={() => setRefreshNonce((value) => value + 1)}
+          )
+        ) : activeTab === "history" ? (
+          <VoteHistoryPage
+            records={walletVoteHistoryRecords}
+            proposalsById={proposalsById}
+            connected={connected}
           />
+        ) : (
+          <FaqPage />
         )}
       </main>
 
@@ -1031,6 +1446,7 @@ export default function App() {
           proposal={selectedAccount}
           proposalId={selectedAccount.proposalId}
           idl={idl}
+          onVoted={handleVoteRecorded}
           onClose={() => {
             setShowVote(false);
             setRefreshNonce((value) => value + 1);

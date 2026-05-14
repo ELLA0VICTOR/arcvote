@@ -126,7 +126,8 @@ Vote encryption intentionally stays in the browser so plaintext vote intent does
 
 - Fixed maximum ballot count per proposal: `10`
 - Optional voter whitelist per proposal: supported
-- Proposal authority cannot vote on their own proposal in the default neutrality model
+- Whitelist enforcement is handled onchain: `create_proposal(... allowed_voters ...)` enables restricted voting when addresses are supplied, and `cast_vote(...)` calls `proposal.is_voter_allowed(&voter_key)` before accepting a ballot.
+- Non-whitelisted wallets are rejected with `VoterNotAllowed`; the proposal authority is also blocked from voting on their own proposal.
 - Vote encoding:
   - `1` = YES
   - `2` = NO
